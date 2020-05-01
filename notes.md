@@ -78,3 +78,19 @@ SQL:Structured Query Language
 - 必须为第二范式
 - 没有传递依赖
 - 请记住，您要维护的可传递依赖关系是要从A-> C获得，您要避免通过B。
+
+**非规范化：**
+
+数据库上的JOINS具有出色的灵活性，但是速度非常慢。如果要处理数据库上的大量读取，则可能需要考虑对表进行非规范化。您将数据转换为标准化形式，然后继续进行非标准化。因此，非规范化是在规范化之后进行的。 	
+
+**规范化**是通过减少数据副本的数量来尝试提高数据完整性。需要添加或更新的数据将在尽可能少的地方完成。
+
+**非规范化**试图通过减少表之间的联接数来提高性能（因为联接可能很慢）。数据完整性会受到一些潜在的打击，因为将会有更多的数据副本（以减少JOINS）。
+
+**实体关系图**（ERD）以简洁易懂的方式显示数据模型。ERD可以用于任何数据模型，并且不限于STAR或SNOWFLAKE模式。常用工具可用于生成ERD。
+
+**星形模式**是[数据集市](https://en.wikipedia.org/wiki/Data_mart) [模式](https://en.wikipedia.org/wiki/Logical_schema)的最简单样式，并且是最广泛用于开发数据仓库和维度数据集市的方法，星型模式由一个或多个[事实表](https://en.wikipedia.org/wiki/Fact_table)组成，该[事实表](https://en.wikipedia.org/wiki/Fact_table)引用了任意数量的[维表](https://en.wikipedia.org/wiki/Dimension_(data_warehouse))。星型模式是[雪花模式](https://en.wikipedia.org/wiki/Snowflake_schema)的重要特例，对于处理更简单的查询更有效
+
+星型模式好处：1. 可以对表格进行非规范化，2.简化查询，3.快速的数据统计；缺点：1.数据完整性和降低查询灵活性 2.不能处理多对多关系
+
+**雪花模式**是[多维数据库](https://en.wikipedia.org/wiki/Multidimensional_database)中表的[逻辑排列](https://en.wikipedia.org/wiki/Logical_schema)，以使[实体关系](https://en.wikipedia.org/wiki/Entity-relationship_model)图类似于[雪花](https://en.wikipedia.org/wiki/Snowflake) 形状。雪花模式由连接到多个[维度的](https://en.wikipedia.org/wiki/Dimension_(data_warehouse))集中[事实表](https://en.wikipedia.org/wiki/Fact_table)表示，“雪花化”是一种在[星型模式](https://en.wikipedia.org/wiki/Star_schema)中标准化维度表的方法。当所有维度表都完全归一化后，结果结构类似于带有[事实表](https://en.wikipedia.org/wiki/Fact_table)的雪花在中间。雪花背后的原理是通过删除低基数属性并形成单独的表来规范维表
