@@ -31,6 +31,27 @@ try:
 	cluster.shutdown()
 except Exception as e:
     print(e)
+    
+# 聚类列,year是主键，artist_name是聚类列
+query = "CREATE TABLE IF NOT EXISTS music_library "
+	query = query + "(year int, artist_name text, album_name text, PRIMARY KEY ((year), artist_name))"
+    session.execute(query)
+
+CREATE TABLE test(
+	a INT,
+	b INT,
+	c INT,
+	d INT,
+	e INT,
+	m INT,
+	PRIMARY KEY(a,b,c))
+WITH CLUSTERING ORDER BY (b DESC, c ASC);
+    
+session.execute("""
+    SELECT artist, song, user FROM user_info 
+    WHERE session_id = 182 and user_id = 10 
+    ORDER BY item_in_session
+""")
 ```
 
 主键：
