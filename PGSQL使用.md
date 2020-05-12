@@ -23,6 +23,7 @@ cur.execute("INSERT INTO music_library (album_name, artist_name, year) \
                  VALUES (%s, %s, %s)", \
                  ("Let It Be", "The Beatles", 1970))
 cur.execute("SELECT * FROM transactions JOIN albums_sold ON transactions.transaction_id = albums_sold.transaction_id ;")
+cur.execute("select * from account where acctid=%s and money>%s",(acctid, money))
 cur.execute("DROP table music_store")
 cur.close()
 conn.close()
