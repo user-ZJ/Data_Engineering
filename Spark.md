@@ -4,6 +4,11 @@
 - **Hadoop分布式文件系统（HDFS）** -一种大数据存储系统，可将数据拆分为多个块，并将这些块存储在计算机集群中。
 - **Apache Pig-**一种类似于SQL的语言，在Hadoop MapReduce上运行
 - **Apache Hive-**在Hadoop MapReduce上运行的另一个类似SQL的界面
+- EC2 : Elastic Compute Cloud
+- EMR: Elastic MapReduce是AWS提供的一项服务，它使您（用户）无需手动安装每台机器的Spark及其依赖项
+- M family: multipurpose family 多用途组合
+- R family:optimized for Ram
+- C family:optimized for CPU
 
 # Spark与Hadoop有何关系？
 
@@ -71,3 +76,17 @@ spark SQL提供了内置的方法最常见的聚合，例如`count()`，`countDi
 在Spark SQL中，我们可以使用pyspark.sql.functions模块中的udf方法定义自己的函数。UDF返回的变量的默认类型为字符串。如果我们想返回其他类型，则需要使用pyspark.sql.types模块中的不同类型来显式地返回。
 
 RDD是数据的低层抽象。在Spark的第一个版本中，您直接使用RDD。您可以将RDD视为分布在各种计算机上的长列表。尽管数据框架和SQL更容易，但仍可以将RDD用作Spark代码的一部分。
+
+# HDFS和AWS S3之间的区别
+
+- **AWS S3**是一个**对象存储系统**，它使用键值对（即存储区和键）存储数据，而**HDFS**是一种**实际的分布式文件系统**，可以保证容错能力。HDFS通过具有重复因素来实现容错能力，这意味着默认情况下，它将在集群中的3个不同节点上复制相同文件（可以将其配置为不同的重复次数）。
+- HDFS通常**安装在本地系统中**，并且传统上让工程师在现场维护和诊断Hadoop生态系统，这**比在云上存储数据要花费更多**。由于**位置**的**灵活性**和**降低的维护成本**，云解决方案变得更加流行。借助您可以在AWS内使用的广泛服务，S3比HDFS更受欢迎。
+- 由于**AWS S3是二进制对象存储库**，因此它可以**存储各种格式**，甚至图像和视频。HDFS将严格要求某种文件格式-流行的选择是**avro**和**parquet**，它们具有相对较高的压缩率，这对于存储大型数据集很有用。
+
+
+
+
+
+* Spark Accumulators
+* Spark Broadcast
+* spark WebUI
