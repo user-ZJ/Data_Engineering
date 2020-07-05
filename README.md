@@ -214,6 +214,7 @@ SparkSession实质上是SQLContext和HiveContext的组合
 - `dropDuplicates()`：返回一个具有基于所有列或仅列的子集的唯一行的新DataFrame
 - `withColumn()`：通过添加列或替换具有相同名称的现有列来返回新的DataFrame。第一个参数是新列的名称，第二个参数是如何计算它的表达式。
 - `agg({"salary": "avg", "age": "max"})`计算平均工资和最大年龄。
+- col("numWords")  选择一列
 
 spark SQL提供了内置的方法最常见的聚合，例如`count()`，`countDistinct()`，`avg()`，`max()`，`min()`，等在pyspark.sql.functions模块
 
