@@ -361,7 +361,10 @@ divvy_dag = DAG(
     description='Analyzes Divvy Bikeshare Data',
     #start_date=datetime(2019, 2, 4),  #开始日期
     start_date=datetime.datetime.now() - datetime.timedelta(days=2),
-    schedule_interval='@daily')  # 时间间隔
+    end_date=datetime(2019, 5, 4),
+    schedule_interval='@daily',# 时间间隔
+    max_active_runs=1    #最多同时执行1个flow
+)  
 
 def hello_world():
     print(“Hello World”)
@@ -643,4 +646,14 @@ JOIN (
 ```
 
 
+
+#### data Lineage(数据沿袭)
+
+数据集的数据沿袭描述了该数据集的创建，移动和计算所涉及的离散步骤。
+
+##### 为什么数据沿袭很重要？
+
+1. **灌输信心：**能够描述特定数据集或分析的数据沿袭将建立对数据消费者（工程师，分析师，数据科学家等）的信心，即我们的数据管道正在使用正确的数据集创建有意义的结果。如果不清楚数据沿袭，则数据使用者将不太可能信任或使用数据。
+2. **定义度量标准：**显示数据沿袭的另一个主要好处是，它使组织中的每个人都可以就如何计算特定度量标准的定义达成共识。
+3. **调试：**数据沿袭可帮助数据工程师在错误发生时追踪错误的根源。如果对数据移动和转换过程的每个步骤都进行了很好的描述，那么在出现问题时就很容易发现问题。
 

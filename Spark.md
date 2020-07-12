@@ -90,3 +90,95 @@ RDD是数据的低层抽象。在Spark的第一个版本中，您直接使用RDD
 * Spark Accumulators
 * Spark Broadcast
 * spark WebUI
+
+
+
+## session
+
+```python
+from pyspark.sql import SparkSession
+
+spark = SparkSession \
+    .builder \
+    .appName("Python Spark SQL basic example") \
+    .config("spark.some.config.option", "some-value") \
+    .getOrCreate()
+```
+
+## DataFrame
+
+```python
+# spark is an existing SparkSession
+df = spark.read.json("examples/src/main/resources/people.json")
+# Displays the content of the DataFrame to stdout
+df.show()
+df.printSchema()  #表结构
+df.select("name").show()
+df.select(df['name'], df['age'] + 1).show()
+df.filter(df['age'] > 21).show()   
+df.groupBy("age").count().show()
+
+
+training = spark.createDataFrame([
+    (0, "a b c d e spark", 1.0),
+    (1, "b d", 0.0),
+    (2, "spark f g h", 1.0),
+    (3, "hadoop mapreduce", 0.0)
+], ["id", "text", "label"])
+
+```
+
+## SQL
+
+```python
+# Register the DataFrame as a SQL temporary view
+df.createOrReplaceTempView("people")
+
+sqlDF = spark.sql("SELECT * FROM people")
+sqlDF.show()
+```
+
+## 全局临时视图
+
+Spark SQL中的临时视图是会话作用域的，如果创建它的会话终止，它将消失。如果要在所有会话之间共享一个临时视图并保持活动状态，直到Spark应用程序终止，则可以创建全局临时视图。全局临时视图与系统保留的`global_temp`数据库相关联，我们必须使用限定名称来引用它，例如`SELECT * FROM global_temp.view1`。
+
+```python
+# Register the DataFrame as a global temporary view
+df.createGlobalTempView("people")
+
+# Global temporary view is tied to a system preserved database `global_temp`
+spark.sql("SELECT * FROM global_temp.people").show()
+# Global temporary view is cross-session
+spark.newSession().sql("SELECT * FROM global_temp.people").show()
+```
+
+## Dataset
+
+Dataset类似于RDD，但是，它们不使用Java序列化或Kryo，而是使用专用的[Encoder](http://spark.apache.org/docs/latest/api/scala/org/apache/spark/sql/Encoder.html)对对象进行序列化以进行处理或通过网络传输。虽然编码器和标准序列化都负责将对象转换为字节，但是编码器是动态生成的代码，并使用一种格式，该格式允许Spark执行许多操作，如过滤，排序和哈希处理，而无需将字节反序列化为对象
+
+dataset只有java和scala接口
+
+## 标量函数
+
+- [数组函数](http://spark.apache.org/docs/latest/sql-ref-functions-builtin.html#array-functions)
+- [地图功能](http://spark.apache.org/docs/latest/sql-ref-functions-builtin.html#map-functions)
+- [日期和时间戳功能](http://spark.apache.org/docs/latest/sql-ref-functions-builtin.html#date-and-timestamp-functions)
+- [JSON函数](http://spark.apache.org/docs/latest/sql-ref-functions-builtin.html#json-functions)
+
+## 类聚集函数
+
+- [汇总功能](http://spark.apache.org/docs/latest/sql-ref-functions-builtin.html#aggregate-functions)
+- [视窗功能](http://spark.apache.org/docs/latest/sql-ref-functions-builtin.html#window-functions)
+
+## UDF（用户定义的函数）
+
+- [标量用户定义函数（UDF）](http://spark.apache.org/docs/latest/sql-ref-functions-udf-scalar.html)
+- [用户定义的聚合函数（UDAF）](http://spark.apache.org/docs/latest/sql-ref-functions-udf-aggregate.html)
+- [与Hive UDF / UDAF / UDTF集成](http://spark.apache.org/docs/latest/sql-ref-functions-udf-hive.html)
+
+```python
+get_hour = udf(lambda x: datetime.datetime.fromtimestamp(x / 1000.0). hour)
+user_log = user_log.withColumn("hour", get_hour(user_log.ts))
+user_log.head()
+```
+
