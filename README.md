@@ -647,6 +647,25 @@ JOIN (
 
 
 
+copy_task = PythonOperator(
+    task_id='load_from_s3_to_redshift',
+    dag=dag,
+    python_callable=load_data_to_redshift
+
+​	sla=
+
+​	provide_context=True
+
+​	param={
+
+​		'table':'stations'
+
+​	}
+
+)
+
+
+
 #### data Lineage(数据沿袭)
 
 数据集的数据沿袭描述了该数据集的创建，移动和计算所涉及的离散步骤。
