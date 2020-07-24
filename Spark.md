@@ -91,9 +91,30 @@ RDD是数据的低层抽象。在Spark的第一个版本中，您直接使用RDD
 * Spark Broadcast
 * spark WebUI
 
+# Spark
+
+Apache Spark是一个在集群上运行的统一计算引擎以及一组并行数据处理软件库
+
+![](images/spark1.png)  
+
+**统一平台**：Spark通过统一计算引擎和利用一套统一的API，支持广泛的数据分析任务，从简单的数据加载，到SQL查询，再到机器学习和流式计算
+
+**计算引擎**:在Spark致力于统一平台的同时，它也专注于计算引擎，Spark从存储系统加载数据并对其执行计算，加载结束时不负责永久存储，也不偏向于使用某一特定的存储系统，主要原因是大多数数据已经存在于混合存储系统
+中，而移动这些数据的费用非常高，因此Spark专注于对数据执行计算，而不考虑数据存储于何处
+
+**配套的软件库**：Spark包括SQL和处理结构化数据的库（Spark SQL）、机器学习库（MLlib）、流处理库（Spark Streaming和较新的结构化流式处理），以及图分析（GraphX）的库。除了这些库之外，还有数百种开源外部库，从用于各种存储系统的连接器到机器学习算法。spark-packages.org（https://spark-packages.org/）上提供了一个外部库的索引。
 
 
-## session
+
+**Spark的基本架构**：Spark管理和协调跨多台计算机的计算任务。Spark用来执行计算任务的若干台机器由像Spark的集群管理器、YARN或Mesos这样的集群管理器管理，然后我们提交Spark应用程序给这些集群管理器，它们将计算资源分配给应用程序，以便完成我们的工作。
+
+**Spark应用程序**：Spark应用程序由一个驱动器进程和一组执行器进程组成。**驱动进程**运行main()函数，位于集群中的一个节点上，它负责三件事：维护Spark应用程序的相关信息；回应用户的程序或输入；分析任务并分发给若干执行器进行处理。**执行器**负责执行驱动器分配给它的实际计算工作，这意味着每个执行器只负责两件事：执行由驱动器分配给它的代码，并将该执行器的计算状态报告给运行驱动器的节点。
+
+![](images/spark2.png)
+
+
+
+## SparkSession
 
 ```python
 from pyspark.sql import SparkSession
@@ -107,6 +128,11 @@ spark = SparkSession \
 
 ## DataFrame
 
+DataFrame是最常见的结构化API，简单来说它是包含行和列的数据表。列和列类型的一些规则被称为模式（schema）。与电子表格不同的是：电子表格位于一台计算机上，而Spark DataFrame可以跨越数千
+台计算机。
+
+我们可以非常容易地将Pandas（Python） DataFrame转换为Spark DataFrame或将R DataFrame转换为Spark DataFrame。
+
 ```python
 # spark is an existing SparkSession
 df = spark.read.json("examples/src/main/resources/people.json")
@@ -118,7 +144,7 @@ df.select(df['name'], df['age'] + 1).show()
 df.filter(df['age'] > 21).show()   
 df.groupBy("age").count().show()
 
-
+# 创建dataframe
 training = spark.createDataFrame([
     (0, "a b c d e spark", 1.0),
     (1, "b d", 0.0),
@@ -126,9 +152,22 @@ training = spark.createDataFrame([
     (3, "hadoop mapreduce", 0.0)
 ], ["id", "text", "label"])
 
+flightData2015 = spark\
+.read\
+.option("inferSchema", "true")\
+.option("header", "true")\
+.csv("/data/flight-data/csv/2015-summary.csv")
 ```
 
+## Dataset
+
+Dataset类似于RDD，但是，它们不使用Java序列化或Kryo，而是使用专用的[Encoder](http://spark.apache.org/docs/latest/api/scala/org/apache/spark/sql/Encoder.html)对对象进行序列化以进行处理或通过网络传输。虽然编码器和标准序列化都负责将对象转换为字节，但是编码器是动态生成的代码，并使用一种格式，该格式允许Spark执行许多操作，如过滤，排序和哈希处理，而无需将字节反序列化为对象
+
+dataset只有java和scala接口
+
 ## SQL
+
+使用Spark SQL，你可以将任何DataFrame注册为数据表或视图（临时表），并使用纯SQL对它进行查询。编写SQL查询或编写DataFrame代码并不会造成性能差异，它们都会被“编译”成相同的底层执行计划。
 
 ```python
 # Register the DataFrame as a SQL temporary view
@@ -137,6 +176,40 @@ df.createOrReplaceTempView("people")
 sqlDF = spark.sql("SELECT * FROM people")
 sqlDF.show()
 ```
+
+## 操作
+
+操作分为**转换操作**和**动作操作**
+
+### 转换操作
+
+要“ 更改”DataFrame，你需要告诉Spark如何修改它以执行你想要的操作，这个过程被称为转换。
+
+如： divisBy2 = myRange.where("number % 2 = 0")
+
+这些转换并没有实际输出，这是因为我们仅指定了一个抽象转换。在我们调用一个动作操作之前，Spark不会真的执行转换操作。
+
+转换操作是使用Spark表达业务逻辑的核心，有两类转换操作：第一类是指定**窄依赖关系**的转换操作，第二类是指定**宽依赖关系**的转换操作。
+
+窄依赖关系（narrow dependency）的转换操作（我们称之为窄转换）是每个输入分区仅决定一个输出分区的转换。在前面的代码片段中，where语句指定了一个窄依赖关系，其中一个分区最多只会对一个输出分区有影响。Spark将自动执行流水线处理，这意味着如果我们在DataFrame上指定了多个过滤操作，它们将全部在内存中执行。
+
+宽依赖关系（wide dependency）的转换（或宽转换）是每个输入分区决定了多个输出分区。这种宽依赖关系的转换经常被称为洗牌（shuffle）操作，它会在整个集群中执行互相交换分区数据的功能。当我们执行shuffle操作时，Spark将结果写入磁盘
+
+### 惰性评估
+
+惰性评估（lazy evaluation）的意思就是等到绝对需要时才执行计算。
+
+一个很好的例子就是DataFrame的谓词下推（predicate pushdown），假设我们构建一个含有多个转换操作的Spark作业，并在最后指定了一个过滤操作，假设这个过滤操作只需要数据源（输入数据）中的某一行数据，则最有效的方法是在最开始仅访问我们需要的单个记录，Spark会通过自动下推这个过滤操作来优化整个物理执行计划。
+
+### 动作操作
+
+转换操作使我们能够建立逻辑转换计划。为了触发计算，我们需要运行一个动作操作 （action）。
+
+有三类动作：
+
+* 在控制台中查看数据的动作。
+* 在某个语言中将数据汇集为原生对象的动作。如collect操作
+*  写入输出数据源的动作
 
 ## 全局临时视图
 
@@ -152,11 +225,7 @@ spark.sql("SELECT * FROM global_temp.people").show()
 spark.newSession().sql("SELECT * FROM global_temp.people").show()
 ```
 
-## Dataset
 
-Dataset类似于RDD，但是，它们不使用Java序列化或Kryo，而是使用专用的[Encoder](http://spark.apache.org/docs/latest/api/scala/org/apache/spark/sql/Encoder.html)对对象进行序列化以进行处理或通过网络传输。虽然编码器和标准序列化都负责将对象转换为字节，但是编码器是动态生成的代码，并使用一种格式，该格式允许Spark执行许多操作，如过滤，排序和哈希处理，而无需将字节反序列化为对象
-
-dataset只有java和scala接口
 
 ## 标量函数
 
