@@ -96,3 +96,13 @@ https://console.aws.amazon.com/elasticmapreduce/
 
 ## Spark
 
+## S3
+
+查看s3中目录
+
+udacity-dend.s3.us-west-2.amazonaws.com
+
+查看s3中文件
+
+udacity-dend.s3.us-west-2.amazonaws.com/log_json_path.json
+

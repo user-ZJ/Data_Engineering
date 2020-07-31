@@ -1,4 +1,28 @@
-# Data_Engineering-
+# Data_Engineering
+### 1. 数据工程师工具
+
+- Hadoop
+- Spark
+- Flink：开源流处理框架，其核心是用Java和Scala编写的分布式流数据流引擎
+- Python：编程语言
+- Scala：编程语言
+- Java：编程语言
+- C++：Scala
+- SQL
+- AWS/Redshift：亚马逊云数据库
+- Azure：微软云
+- Kafka
+- Hive
+- Pig
+- Impala
+- Beam
+- Cloudera
+- Hortonworks
+
+
+
+
+
 ETL: extract transform load, ETL通常是一个连续的，持续的过程，具有定义明确的工作流。ETL首先从同质或异类数据源中提取数据。然后，对数据进行清洗，丰富，转换和存储，然后再存储到湖泊或数据仓库中
 
 ELT（提取，加载，转换）是ETL的一种变体，其中首先将提取的数据加载到目标系统中。在将数据加载到数据仓库中之后执行转换。当目标系统足够强大时，ELT通常可以很好地工作来处理转换。像Amazon Redshift和Google BigQ这样的分析数据库
