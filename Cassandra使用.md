@@ -1,4 +1,58 @@
+## ubuntu 安装 cassandra
+
+https://cassandra.apache.org/download/
+
+```shell
+echo "deb https://downloads.apache.org/cassandra/debian 311x main" | sudo tee -a /etc/apt/sources.list.d/cassandra.sources.list
+curl https://downloads.apache.org/cassandra/KEYS | sudo apt-key add -
+sudo apt-key adv --keyserver pool.sks-keyservers.net --recv-key A278B781FE4B2BDA (可选)
+sudo apt-get update
+sudo apt-get install cassandra
+sudo service cassandra stop
+sudo service cassandra start
+# 查看cassandra运行状态
+nodetool status
+# 默认配置文件路径在
+/etc/cassandra
+# 默认日志文件路径在
+/var/log/cassandra/
+# 默认数据文件路径在
+/var/lib/cassandra
+# 配置启动选项（堆大小等）
+/etc/default/cassandra
+```
+
+## python 安装
+
+```shell
 pip install cassandra-driver
+```
+
+```python
+# 连接集群
+cluster = Cluster(['127.0.0.1'])
+# 创建会话
+session = cluster.connect()
+# 创建keyspace
+session.execute("""
+    CREATE KEYSPACE IF NOT EXISTS udacity 
+    WITH REPLICATION = 
+    { 'class' : 'SimpleStrategy', 'replication_factor' : 1 }"""
+)
+# 连接keyspace
+session.set_keyspace('udacity')
+# 创建表
+session.execute("""
+	CREATE TABLE IF NOT EXISTS songs
+	(year int, song_title text, artist_name text, album_name text, single boolean, PRIMARY KEY (year, artist_name))
+""")
+# 关闭会话
+session.shutdown()
+# 断开集群连接
+cluster.shutdown()
+```
+
+
 
 ```python
 import cassandra

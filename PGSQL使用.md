@@ -1,3 +1,60 @@
+
+
+## postgresql安装
+
+```shell
+sudo apt-get install postgresql
+```
+
+安装完成后，默认会：
+
+（1）创建名为"postgres"的Linux用户
+
+（2）创建名为"postgres"、不带密码的默认数据库账号作为数据库管理员
+
+（3）创建名为"postgres"的表
+
+安装完成后的一些默认信息如下：
+
+config /etc/postgresql/9.5/main 
+data /var/lib/postgresql/9.5/main 
+locale en_US.UTF-8 
+socket /var/run/postgresql 
+port 5432
+
+https://www.cnblogs.com/Siegel/p/6917213.html
+
+## 安装
+
+```shell
+apt install libpq-dev
+pip install psycopg2
+```
+
+## 使用
+
+```python
+# 创建用户（shell）
+echo "alter user student createdb;" | sudo -u postgres psql
+# 连接数据库
+conn = psycopg2.connect("host=127.0.0.1 dbname=studentdb user=student password=student")
+# 获取游标
+cur = conn.cursor()
+# 设置事务自动提交
+conn.set_session(autocommit=True)
+# 创建database,需要先获取一个数据库连接的游标
+cur.execute("create database udacity")
+# 创建表
+cur.execute("CREATE TABLE IF NOT EXISTS songs (song_title varchar, artist_name varchar, year int, album_name varchar, single Boolean);")
+# 插入和查询等 使用cur.execute执行sql
+# 关闭游标
+cur.close()
+# 关闭连接
+conn.close()
+```
+
+
+
 ```python
 try:
 	conn = psycopg2.connect("host=127.0.0.1 dbname=studentdb user=student password=student")
