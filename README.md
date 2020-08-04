@@ -114,7 +114,7 @@ NoSQL用于超大规模数据的存储。这些类型的数据存储不需要固
 3. 时间序列数据
 4. 任何繁重的工作量都写入数据库（因为Apache Cassandra已针对写入进行了优化）
 
-### 3.2 关系型数据库建模
+### 2.3 关系型数据库建模
 
 #### **在线分析处理（OLAP-online analytical processing）：**
 针对这些工作负载进行了优化的数据库允许进行复杂的分析和临时查询，包括聚合。这些类型的数据库针对读取进行了优化。
@@ -169,13 +169,21 @@ NoSQL用于超大规模数据的存储。这些类型的数据存储不需要固
 
 星型模式好处：1. 可以对表格进行非规范化，2.简化查询，3.快速的数据统计；缺点：1.数据完整性和降低查询灵活性 2.不能处理多对多关系
 
+![](images/star-schemas.png)
+
 **雪花模式**是[多维数据库](https://en.wikipedia.org/wiki/Multidimensional_database)中表的[逻辑排列](https://en.wikipedia.org/wiki/Logical_schema)，以使[实体关系](https://en.wikipedia.org/wiki/Entity-relationship_model)图类似于[雪花](https://en.wikipedia.org/wiki/Snowflake) 形状。雪花模式由连接到多个[维度的](https://en.wikipedia.org/wiki/Dimension_(data_warehouse))集中[事实表](https://en.wikipedia.org/wiki/Fact_table)表示，“雪花化”是一种在[星型模式](https://en.wikipedia.org/wiki/Star_schema)中标准化维度表的方法。当所有维度表都完全归一化后，结果结构类似于带有[事实表](https://en.wikipedia.org/wiki/Fact_table)的雪花在中间。雪花背后的原理是通过删除低基数属性并形成单独的表来规范维表
 
+![](images/snowflake-schemas.png)
 
+### 2.3 NoSQL 数据库建模
 
+#### CAP定理：（NoSQL 数据库只能保证CAP中的两项）
 
+- **一致性**（**Consistency**:）：从数据库中读取的每个数据都会获取最新（且正确）的数据或错误
+- **可用性**（**Availability**）：收到每个请求并给出响应-不能保证数据是最新更新
+- **分区容限**（**Partition Tolerance**）：无论节点之间是否失去网络连接，系统都可以继续工作
 
-
+ CAP定理意味着，在存在网络分区的情况下，必须在一致性和可用性之间进行选择。” 因此，分布式数据库中没有一致性和可用性之类的东西，因为它必须始终容忍网络问题。您只能具有一致性和分区容限（CP）或可用性和分区容限（AP）
 
 
 
