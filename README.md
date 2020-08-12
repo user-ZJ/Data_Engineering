@@ -219,6 +219,36 @@ Apache Cassandra组成部分：
 
 销售事实表：Prod_id(引用产品维度表), TimeKey(引用时间维度表), SalesAmount(销售总量，以货币计), Unit(销售量)
 
+#### 3.2 ETL
+
+ETL: extract transform load, ETL通常是一个连续的，持续的过程，具有定义明确的工作流。ETL首先从同质或异类数据源中提取数据。然后，对数据进行清洗，丰富，转换和存储，然后再存储到湖泊或数据仓库中
+
+ELT（提取，加载，转换）是ETL的一种变体，其中首先将提取的数据加载到目标系统中。在将数据加载到数据仓库中之后执行转换。当目标系统足够强大时，ELT通常可以很好地工作来处理转换。像Amazon Redshift和Google BigQ这样的分析数据库
+
+#### 3.3 Inmon和Kimball架构
+
+Inmon和Kimball架构最大的不同就是企业数据仓库的模式不同，inmon是采用第三范式的格式，而kimball则采用了多维模型–星型模型，并且还是最低粒度的数据存储。其次是，维度数据仓库可以被分析系统直接访问，当然这种访问方式毕竟在分析过程中很少使用。最后就是数据集市的概念有逻辑上的区别，在kimball的架构中，数据集市有维度数据仓库的高亮显示的表的子集来表示。
+
+https://www.jianshu.com/p/78ba03bcc01e
+
+#### 3.4 OLAP CUBES
+
+Roll-up:上滚，对一个维度进行汇总
+
+Drill-Down:下钻，拆分一个维度
+
+Slice:切片，将维度从N缩小到N-1,方法是将某一维度指定为特定的值，如month='MAR'
+
+Dice:切块，维度相同，方法是将某一维度指定为某些值，如month in ['MAR','FEB']
+
+
+
+ROLAP(Relational OLAP):基于关系数据库的OLAP实现
+
+MOLAP(Multidimensional OLAP):基于多维数据组织的OLAP实现
+
+HOLAP(Hybrid OLAP): 基于混合数据组织的OLAP实现
+
 
 
 
@@ -239,9 +269,7 @@ Apache Cassandra组成部分：
 
 
 
-ETL: extract transform load, ETL通常是一个连续的，持续的过程，具有定义明确的工作流。ETL首先从同质或异类数据源中提取数据。然后，对数据进行清洗，丰富，转换和存储，然后再存储到湖泊或数据仓库中
-
-ELT（提取，加载，转换）是ETL的一种变体，其中首先将提取的数据加载到目标系统中。在将数据加载到数据仓库中之后执行转换。当目标系统足够强大时，ELT通常可以很好地工作来处理转换。像Amazon Redshift和Google BigQ这样的分析数据库
+## 4. 大数据
 
 ### MapReduce
 
@@ -265,7 +293,7 @@ HDFS（Hadoop Distributed File System）是Hadoop生态系统中的文件系统
 
 ### Spark
 
-Hadoop生态系统是一种比Spark生态系统稍老的技术。通常，Hadoop MapReduce比Spark慢，因为Hadoop在中间步骤中将数据写出到磁盘。
+Hadoop生态系统是一种比Spark生态系统稍老的技术。通常，Hadoop MapReduce比Spark慢，因为Hadoop在中间步骤中将数据写出到磁盘，而Spark尝试将中间结果尽可能保留在内存中。
 
 #### RDD
 
@@ -348,6 +376,8 @@ user_log_2.take(2)
 user_log_2.select("userID").show()
 user_log_2.take(1)
 ```
+
+udf
 
 ```python
 from pyspark.sql import SparkSession
