@@ -77,6 +77,16 @@ spark SQL提供了内置的方法最常见的聚合，例如`count()`，`countDi
 
 RDD是数据的低层抽象。在Spark的第一个版本中，您直接使用RDD。您可以将RDD视为分布在各种计算机上的长列表。尽管数据框架和SQL更容易，但仍可以将RDD用作Spark代码的一部分。
 
+# spark从S3中读数据
+
+```python
+df = spark.read.load(“s3://my_bucket/path/to/file/file.csv”)
+# 如果我们使用的是spark，并且存储桶下面的所有对象都具有相同的架构，则可以执行以下操作
+df = spark.read.load(“s3://my_bucket/”)
+```
+
+
+
 # HDFS和AWS S3之间的区别
 
 - **AWS S3**是一个**对象存储系统**，它使用键值对（即存储区和键）存储数据，而**HDFS**是一种**实际的分布式文件系统**，可以保证容错能力。HDFS通过具有重复因素来实现容错能力，这意味着默认情况下，它将在集群中的3个不同节点上复制相同文件（可以将其配置为不同的重复次数）。
@@ -249,5 +259,16 @@ spark.newSession().sql("SELECT * FROM global_temp.people").show()
 get_hour = udf(lambda x: datetime.datetime.fromtimestamp(x / 1000.0). hour)
 user_log = user_log.withColumn("hour", get_hour(user_log.ts))
 user_log.head()
+```
+
+## 读CSV文件
+
+```python
+spark = SparkSession.builder.appName("myproject").getOrCreate()
+flightData2015 = spark.read\
+	.option("inferSchema", "true").option("header", "true")\
+	.csv("/data/flight-data/csv/2015-summary.csv")
+df.printSchema()
+df.show(5)
 ```
 

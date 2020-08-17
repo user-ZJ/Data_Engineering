@@ -269,7 +269,7 @@ HOLAP(Hybrid OLAP): 基于混合数据组织的OLAP实现
 
 
 
-## 4. 大数据
+## 4. 大数据框架
 
 ### MapReduce
 
@@ -544,7 +544,7 @@ print(songs_in_hour_pd)
 
 **sqlContext.jsonFile(“/path/to/myDir”)** is deprecated from spark 1.6 instead use **spark.read.json(“/path/to/myDir”) or spark.read.format(“json”).load(“/path/to/myDir”)**
 
-### 数据湖
+## 5. 数据湖
 
 数据湖概念的诞生，源自企业面临的一些挑战，如数据应该以何种方式处理和存储。最开始，企业对种类庞杂的应用程序的管理都经历了一个比较自然的演化周期。
 
