@@ -138,8 +138,7 @@ spark = SparkSession \
 
 ## DataFrame
 
-DataFrame是最常见的结构化API，简单来说它是包含行和列的数据表。列和列类型的一些规则被称为模式（schema）。与电子表格不同的是：电子表格位于一台计算机上，而Spark DataFrame可以跨越数千
-台计算机。
+DataFrame是最常见的结构化API，简单来说它是包含行和列的数据表。列和列类型的一些规则被称为模式（schema）。与电子表格不同的是：电子表格位于一台计算机上，而Spark DataFrame可以跨越数千台计算机。
 
 我们可以非常容易地将Pandas（Python） DataFrame转换为Spark DataFrame或将R DataFrame转换为Spark DataFrame。
 
@@ -168,6 +167,11 @@ flightData2015 = spark\
 .option("header", "true")\
 .csv("/data/flight-data/csv/2015-summary.csv")
 ```
+
+## 数据分区
+为了让多个执行器并行地工作,S p a r k将数据分解成多个数据块,每个数据块叫做一个分区。分区是位于集群中的一台物理机上的多行数据的集合,DataFrame的分区也说明了在执行过程中,数据在集群中的物理分布。如果只有一个
+分区,即使拥有数千个执行器,S p a r k也只有一个执行器在处理数据。类似地,如果有多个分区,但只有一个执行器,那么S p a r k仍然只有一个执行器在处理数据,就是因为只有一个计算资源单位
+值得注意的是,当使用DataFrame时,(大部分时候)你不需要手动操作分区,只需指定数据的高级转换操作,然后Spark决定此工作如何在集群上执行
 
 ## Dataset
 
@@ -221,6 +225,11 @@ sqlDF.show()
 * 在某个语言中将数据汇集为原生对象的动作。如collect操作
 *  写入输出数据源的动作
 
+**可以通过调用explain函数观察到Spark正在创建一个执行计划,并且可以看到这个计划将会怎样在集群上执行,调用某个DataFrame的explain操作会显示DataFrame的来源(即Spark是如何执行查询操作的)**
+```python
+flightData2015.sort("count").explain()
+```
+
 ## 全局临时视图
 
 Spark SQL中的临时视图是会话作用域的，如果创建它的会话终止，它将消失。如果要在所有会话之间共享一个临时视图并保持活动状态，直到Spark应用程序终止，则可以创建全局临时视图。全局临时视图与系统保留的`global_temp`数据库相关联，我们必须使用限定名称来引用它，例如`SELECT * FROM global_temp.view1`。
@@ -240,7 +249,7 @@ spark.newSession().sql("SELECT * FROM global_temp.people").show()
 ## 标量函数
 
 - [数组函数](http://spark.apache.org/docs/latest/sql-ref-functions-builtin.html#array-functions)
-- [地图功能](http://spark.apache.org/docs/latest/sql-ref-functions-builtin.html#map-functions)
+- [Map功能](http://spark.apache.org/docs/latest/sql-ref-functions-builtin.html#map-functions)
 - [日期和时间戳功能](http://spark.apache.org/docs/latest/sql-ref-functions-builtin.html#date-and-timestamp-functions)
 - [JSON函数](http://spark.apache.org/docs/latest/sql-ref-functions-builtin.html#json-functions)
 
