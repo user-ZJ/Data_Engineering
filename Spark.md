@@ -142,6 +142,8 @@ DataFrame是最常见的结构化API，简单来说它是包含行和列的数�
 
 我们可以非常容易地将Pandas（Python） DataFrame转换为Spark DataFrame或将R DataFrame转换为Spark DataFrame。
 
+Spark中的DataFrame和Dataset代表不可变的数据集合，可以通过它指定对特定位置数据的操作，该操作将以惰性评估方式执行。当对DataFrame执行动作操作时，将触发Spark执行具体转换操作并返回结果，这些代表了如何操纵行和列来计算出用户期望结果的执行计划
+
 ```python
 # spark is an existing SparkSession
 df = spark.read.json("examples/src/main/resources/people.json")
@@ -168,7 +170,35 @@ flightData2015 = spark\
 .csv("/data/flight-data/csv/2015-summary.csv")
 ```
 
+### Schema
+
+Schema定义了DataFrame的列名和类型，可以手动定义或者从数据源读取模式（通常定义为模式读取）。
+
+### 数据类型
+
+| 数据类型      | Python的值类型                                               | 获取或者创建数据类型的API                                    |
+| ------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| ByteType      | int或long。注意：数字在运行时转换为1字节 <br/>的带符号整数。 确保数字在-128~127的范围内 | ByteType()                                                   |
+| ShortType     | int或long。注意：数字在运行时将转换为2字 <br/>节带符号的整数。 确保数字在-32768到<br/>32767的范围内 | ShortType()                                                  |
+| IntegerType   | int或long。注意：Python对“整数”有一个<br/>宽松的定义。如果使用IntegerType()，那么太<br/>大的数字将被Spark SQL拒绝。在这种情况下，<br/>最好使用LongType() | IntegerType()                                                |
+| LongType      | long。注意：数字在运行时将转换为8字节有符 <br/>号整数。确保数字在-9223372036854775808~<br/>9223372036854775807范围内。否则，请将<br/>数据类型转换为decimal.Decimal，并使用<br/>DecimalType | IntegerType()                                                |
+| FloatType     | float型。注意：在运行时，数字将被转换为4 <br/>字节的单精度浮点数 | FloatType()                                                  |
+| DoubleType    | float型                                                      | DoubleType()                                                 |
+| DecimalType   | decimal.Decimal                                              | DecimalType()                                                |
+| StringType    | string                                                       | StringType()                                                 |
+| BinaryType    | bytearray                                                    | BinaryType()                                                 |
+| BooleanType   | Bool                                                         | BooleanType()                                                |
+| TimestampType | datetime.datetime                                            | TimestampType()                                              |
+| DateType      | datetime.date                                                | DateType()                                                   |
+| ArrayType     | List，tuple或array                                           | ArrayType（elementType，<br/>[containsNull]）。注意：<br/>containsNull的默认值为<br/>True |
+| MapType       | 字典                                                         | MapType（keyType，<br/>valueType，<br/>[valueContainsNull]）。<br/>注意：valueContainsNull<br/>的默认值为True |
+| StructType    | 列表或元组                                                   | StructType（fields）。注<br/>意： fields是一个包含多<br/>个StructFiled的list，并且<br/>任意两个StructField不能<br/>同名 |
+| StructField   | 该字段对应的Python数据类型（例如，int是<br/>IntegerType的StructField） | StructField（name，<br/>dataType，[nullable]）。<br/>注意：nullable指定该<br/>field是否可以为空值，默<br/>认值为True |
+
+
+
 ## 数据分区
+
 为了让多个执行器并行地工作,S p a r k将数据分解成多个数据块,每个数据块叫做一个分区。分区是位于集群中的一台物理机上的多行数据的集合,DataFrame的分区也说明了在执行过程中,数据在集群中的物理分布。如果只有一个
 分区,即使拥有数千个执行器,S p a r k也只有一个执行器在处理数据。类似地,如果有多个分区,但只有一个执行器,那么S p a r k仍然只有一个执行器在处理数据,就是因为只有一个计算资源单位
 值得注意的是,当使用DataFrame时,(大部分时候)你不需要手动操作分区,只需指定数据的高级转换操作,然后Spark决定此工作如何在集群上执行
@@ -270,6 +300,17 @@ user_log = user_log.withColumn("hour", get_hour(user_log.ts))
 user_log.head()
 ```
 
+## 配置
+
+默认情况下，shuffle操作会输出200个shuffle分区，我们将此值设置为5以减少shuffle输出分区的数量：
+
+```python
+spark.conf.set("spark.sql.shuffle.partitions", "5")
+flightData2015.sort("count").take(2)
+```
+
+
+
 ## 读CSV文件
 
 ```python
@@ -279,5 +320,31 @@ flightData2015 = spark.read\
 	.csv("/data/flight-data/csv/2015-summary.csv")
 df.printSchema()
 df.show(5)
+
+staticDataFrame = spark.read.format("csv")\
+.option("header", "true")\
+.option("inferSchema", "true")\
+.load("/data/retail-data/by-day/*.csv")
 ```
+
+## spark-submit
+
+spark-submit轻松地将测试级别的交互式程序转化为生产级别的应用程序。sparksubmit将你的应用程序代码发送到一个集群并在那里执行，应用程序将一直运行，直到它（完成任务后）正确退出或遇到错误。你的程序可以在集群管理器的支持下进行，包括Standalone，Mesos和YARN等。
+
+spark-submit提供了若干控制选项，你可以指定应用程序需要的资源，以及应用程序的运行方式和运行参数等
+
+你可以使用Spark支持的任何语言编写应用程序，然后提交它执行
+
+```python
+./bin/spark-submit \
+--master local \
+./examples/src/main/python/pi.py 10
+```
+
+## Dataset：类型安全的结构化API
+
+Dataset，用于在Java和Scala中编写静态类型的代码。Dataset API在Python和R中不可用，因为这些语
+言是动态类型的。
+
+**暂时跳过**
 
