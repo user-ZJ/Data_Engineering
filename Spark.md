@@ -138,9 +138,11 @@ spark = SparkSession \
 
 ## DataFrame
 
-DataFrame是最常见的结构化API，简单来说它是包含行和列的数据表。列和列类型的一些规则被称为模式（schema）。与电子表格不同的是：电子表格位于一台计算机上，而Spark DataFrame可以跨越数千台计算机。
+DataFrame是最常见的结构化API，简单来说它是包含行和列的数据表。列和列类型的一些规则被称为**模式**（schema）。与电子表格不同的是：电子表格位于一台计算机上，而Spark DataFrame可以跨越数千台计算机。
 
 我们可以非常容易地将Pandas（Python） DataFrame转换为Spark DataFrame或将R DataFrame转换为Spark DataFrame。
+
+DataFrame的分区定义了DataFrame以及Dataset在集群上的物理分布，而划分模式定义了partition的分配方式，你可以自定义分区的方式，也可以采取随机分配的方式。
 
 Spark中的DataFrame和Dataset代表不可变的数据集合，可以通过它指定对特定位置数据的操作，该操作将以惰性评估方式执行。当对DataFrame执行动作操作时，将触发Spark执行具体转换操作并返回结果，这些代表了如何操纵行和列来计算出用户期望结果的执行计划
 
@@ -170,9 +172,67 @@ flightData2015 = spark\
 .csv("/data/flight-data/csv/2015-summary.csv")
 ```
 
-### Schema
+### 模式Schema
 
-Schema定义了DataFrame的列名和类型，可以手动定义或者从数据源读取模式（通常定义为模式读取）。
+Schema定义了DataFrame的列名和类型，可以**手动定义**或者**从数据源读取模式**（通常定义为模式读取）。
+
+一个模式是由许多字段构成的StructType。这些字段即为StructField，具有名称、类型、布尔标志（该标志指定该列是否可以包含缺失值或空值），并且用户可指定与该列关联的元数据（metadata）。元数据存储着有关此列的信息。模式还可以包含其他的StructType（Spark的复杂类型）
+
+如果（在运行时）数据的类型与定义的schema模式不匹配，Spark将抛出一个错误。
+
+```python
+from pyspark.sql.types import StructField, StructType, StringType, LongType
+myManualSchema = StructType([
+StructField("DEST_COUNTRY_NAME", StringType(), True),
+StructField("ORIGIN_COUNTRY_NAME", StringType(), True),
+StructField("count", LongType(), False, metadata={"hello":"world"})
+])
+df = spark.read.format("json").schema(myManualSchema)\
+    .load("/data/flight-data/json/2015-summary.json")
+```
+
+### 列和表达式
+
+```python
+from pyspark.sql.functions import col, column
+col("someColumnName")
+df.col("count")  #获取列内容
+from pyspark.sql.functions import expr
+expr("(((someCol + 5) * 200) - 6) < otherCol")
+```
+
+### 记录和行
+
+在Spark中，DataFrame的每一行都是一个记录，而记录是Row类型的对象。Spark使用列表达式操纵Row类型对象。Row对象内部其实是字节数组，但是Spark没有提供访问这些数组的接口，因此我们只能使用列表达式去操纵。
+
+当使用DataFrame时，向驱动器请求行的命令总是返回一个或多个Row类型的行数据
+
+需要注意的是，只有DataFrame具有模式，行对象本身没有模式，这意味着，如果你手动创建Row对象，则必须按照该行所附属的DataFrame的列顺序来初始化Row对象
+
+```python
+# 在DataFrame上调用first()来查看一行
+df.first()
+from pyspark.sql import Row
+myRow = Row("Hello", None, 1, False)
+myRow[0]
+myRow[2]
+```
+
+```python
+# 使用私有数据和自定义模式创建dataframe
+from pyspark.sql import Row
+from pyspark.sql.types import StructField, StructType, StringType, LongType
+myManualSchema = StructType([
+StructField("some", StringType(), True),
+StructField("col", StringType(), True),
+StructField("names", LongType(), False)
+])
+myRow = Row("Hello", None, 1)
+myDf = spark.createDataFrame([myRow], myManualSchema)
+myDf.show()
+```
+
+
 
 ### 数据类型
 
@@ -195,7 +255,250 @@ Schema定义了DataFrame的列名和类型，可以手动定义或者从数据�
 | StructType    | 列表或元组                                                   | StructType（fields）。注<br/>意： fields是一个包含多<br/>个StructFiled的list，并且<br/>任意两个StructField不能<br/>同名 |
 | StructField   | 该字段对应的Python数据类型（例如，int是<br/>IntegerType的StructField） | StructField（name，<br/>dataType，[nullable]）。<br/>注意：nullable指定该<br/>field是否可以为空值，默<br/>认值为True |
 
+### select和selectExpr
 
+Select函数和selectExpr函数支持在DataFrame上执行类似数据表的SQL查询
+
+```python
+# SELECT DEST_COUNTRY_NAME FROM dfTable LIMIT 2
+df.select("DEST_COUNTRY_NAME").show(2)
+# SELECT DEST_COUNTRY_NAME, ORIGIN_COUNTRY_NAME FROM dfTable LIMIT 2
+df.select("DEST_COUNTRY_NAME", "ORIGIN_COUNTRY_NAME").show(2)
+
+from pyspark.sql.functions import expr, col, column
+df.select(
+expr("DEST_COUNTRY_NAME"),
+col("DEST_COUNTRY_NAME"),
+column("DEST_COUNTRY_NAME"))\
+.show(2)
+```
+
+expr是我们目前使用到的最灵活的引用方式。它能够引用一列，也可以引用对列进行操纵的字符串表达式。
+
+```python
+# SELECT DEST_COUNTRY_NAME as destination FROM dfTable LIMIT 2
+df.select(expr("DEST_COUNTRY_NAME AS destination")).show(2)
+df.select(expr("DEST_COUNTRY_NAME as destination").alias("DEST_COUNTRY_NAME")).show(2)
+```
+
+因为select后跟着一系列expr是非常常见的写法，所以Spark有一个有效地描述此操作序列的接口：selectExpr，它可能是最常用的接口
+
+```python
+df.selectExpr("DEST_COUNTRY_NAME as newColumnName", "DEST_COUNTRY_NAME").show(2)
+# SELECT *,(DEST_COUNTRY_NAME=ORIGIN_COUNTRY_NAME) as withinCountry FROM dfTable LIMIT 2
+df.selectExpr(
+"*", # all original columns
+"(DEST_COUNTRY_NAME = ORIGIN_COUNTRY_NAME) as withinCountry")\
+.show(2)
+# SELECT avg(count), count(distinct(DEST_COUNTRY_NAME)) FROM dfTable LIMIT 2
+df.selectExpr("avg(count)", "count(distinct(DEST_COUNTRY_NAME))").show(2)
+```
+
+### 字面量（literal）
+
+有时候需要给Spark传递显式的值，它们只是一个值而非新列。这可能是一个常量值，或接下来需要比较的值。我们的方式是通过字面量（literal）传递
+
+```python
+from pyspark.sql.functions import lit
+# SELECT *, 1 as One FROM dfTable LIMIT 2
+df.select(expr("*"), lit(1).alias("One")).show(2)
+```
+
+### 添加列
+
+```python
+# SELECT *, 1 as numberOne FROM dfTable LIMIT 2
+df.withColumn("numberOne", lit(1)).show(2)
+df.withColumn("withinCountry", expr("ORIGIN_COUNTRY_NAME == DEST_COUNTRY_NAME")).show(2)
+# 使用withcolumn重命名列
+df.withColumn("Destination", expr("DEST_COUNTRY_NAME")).columns
+# 重命名列
+df.withColumnRenamed("DEST_COUNTRY_NAME", "dest").columns
+```
+
+### 删除列
+
+```python
+dfWithLongColName.drop("ORIGIN_COUNTRY_NAME", "DEST_COUNTRY_NAME")
+```
+
+### 更改列的类型
+
+```python
+df.withColumn("count2", col("count").cast("long"))
+```
+
+### 转义符
+
+你可能会遇到列名中包含空格或者连字符等保留字符，要处理这些保留字符意味着要适当地对列名进行转义。在Spark中，我们通过使用反引号（`）字符来实现。
+
+```python
+dfWithLongColName.selectExpr(
+"`This Long Column-Name`",
+"`This Long Column-Name` as `new col`")\
+.show(2)
+```
+
+### 区分大小写
+
+Spark默认是不区分大小写的，但可以通过如下配置使Spark区分大小写：
+
+```python
+# set spark.sql.caseSensitive true
+spark.conf.set("spark.sql.caseSensitive", "true")
+```
+
+### 过滤操作（where和filter）
+
+where和filter可以执行相同的操作，接受相同参数类型,一般使用where，因为这更像SQL语法
+
+```python
+df.filter(col("count") < 2).show(2)
+df.where("count < 2").show(2)
+```
+
+我们可能本能地想把多个过滤条件放到一个表达式中，尽管这种方式可行，但是并不总有效。因为Spark会同时执行所有过滤操作，不管过滤条件的先后顺序，因此当你想指定多个AND过滤操作时，只要按照先后顺序以链式的方式把这些过滤条件串联起来
+
+```python
+# SELECT * FROM dfTable WHERE count < 2 AND ORIGIN_COUNTRY_NAME != "Croatia" LIMIT 2
+df.where(col("count") < 2).where(col("ORIGIN_COUNTRY_NAME") != "Croatia")\
+.show(2)
+```
+
+### 去重(distinct)
+
+是一个转换操作
+
+```python
+df.select("ORIGIN_COUNTRY_NAME", "DEST_COUNTRY_NAME").distinct().count()
+```
+
+### 随机抽样（sample）
+
+```python
+seed = 5
+# 指定是否放回抽样， true为有放回的抽样（可以有重复样本），false为无放回的抽样（无重复样本）
+withReplacement = False 
+fraction = 0.5
+df.sample(withReplacement, fraction, seed).count()
+```
+
+### 随机分割（randomSplit）
+
+当需要将原始DataFrame随机分割成多个分片时，可以使用随机分割。这通常是在机器学习算法中，用于分割数据集来创建训练集、验证集和测试集
+
+```python
+seed = 5
+dataFrames = df.randomSplit([0.25, 0.75], seed)
+dataFrames[0].count() > dataFrames[1].count()
+```
+
+### union操作-连接和追加行
+
+DataFrame是不可变的，这意味着用户不能向DataFrame追加行。如果想要向DataFrame追加行，你必须将原始的DataFrame与新的DataFrame联合起来，即union操作，也就是拼接两个DataFrame。若想联合两个DataFrame，你必须确保它们具有相同的模式和列数，否则联合操作将会失败
+
+```python
+from pyspark.sql import Row
+schema = df.schema
+newRows = [
+  Row("New Country", "Other Country", 5L),
+  Row("New Country 2", "Other Country 3", 1L)
+]
+parallelizedRows = spark.sparkContext.parallelize(newRows)
+newDF = spark.createDataFrame(parallelizedRows, schema)
+df.union(newDF)\
+  .where("count = 1")\
+  .where(col("ORIGIN_COUNTRY_NAME") != "United States")\
+  .show()
+```
+
+### 排序
+
+sort和orderBy方法是相互等价的操作，执行的方式也一样。它们均接收列表达式和字符串，以及多个列。默认设置是按升序排序
+
+```python
+df.sort("count").show(5)
+df.orderBy("count", "DEST_COUNTRY_NAME").show(5)
+df.orderBy(col("count"), col("DEST_COUNTRY_NAME")).show(5)
+from pyspark.sql.functions import desc, asc
+df.orderBy(expr("count desc")).show(2)
+df.orderBy(col("count").desc(), col("DEST_COUNTRY_NAME").asc()).show(2)
+```
+
+出于性能优化的目的，最好是在进行别的转换之前，先对每个分区进行内部排序。可以使用sortWithinPartitions方法实现这一操作
+
+```python
+spark.read.format("json").load("/data/flight-data/json/*-summary.json")\
+.sortWithinPartitions("count")
+```
+
+asc_nulls_first指示空值安排在升序排列的前面，
+
+desc_nulls_first指示空值安排在降序排列的前面
+
+asc_nulls_last指示空值安排在升序排列的后面
+
+desc_nulls_last指示空值安排在降序排列的后面
+
+### limit
+
+```python
+# SELECT * FROM dfTable LIMIT 6
+df.limit(5).show()
+# SELECT * FROM dfTable ORDER BY count desc LIMIT 6
+df.orderBy(expr("count desc")).limit(6).show()
+```
+
+### 重分区和合并
+
+另一个重要的优化是根据一些经常过滤的列对数据进行分区，控制跨群集数据的物理布局，包括分区方案和分区数
+
+不管是否有必要，重新分区都会导致数据的全面洗牌。如果将来的分区数大于当前的分区数，或者当你想要基于某一组特定列来进行分区时，通常只能重新分区
+
+```python
+df.rdd.getNumPartitions() #1
+df.repartition(5)
+# 如果你知道你经常按某一列执行过滤操作，则根据该列进行重新分区是很有必要的
+df.repartition(col("DEST_COUNTRY_NAME"))
+# 还可以指定你想要的分区数量
+df.repartition(5, col("DEST_COUNTRY_NAME"))
+```
+
+合并操作（coalesce）不会导致数据的全面洗牌，但会尝试合并分区。
+
+```python
+df.repartition(5, col("DEST_COUNTRY_NAME")).coalesce(2)
+```
+
+### 驱动器获取行
+
+Spark的驱动器维护着集群状态，有时候你需要让驱动器收集一些数据到本地，这样你可以在本地机器上处理它们。
+
+到目前为止，我们并没有明确定义这个操作。但我们使用了几种不同的方法来实现完全相同的效果。下面的代码示例使用collect函数从整个DataFrame中获取所有数据，使用take函数选择前N行，并使用show函数打印一些行。
+
+```python
+collectDF = df.limit(10)
+collectDF.take(5) # 获取整数行
+collectDF.show() # 更友好的打印
+collectDF.show(5, False)
+collectDF.collect()
+```
+
+为了遍历整个数据集，还有一种让驱动器获取行的方法，即toLocalIterator函数。toLocalIterator函数式一个迭代器，将每个分区的数据返回给驱动器。这个函数允许你以串行的方式一个一个分区地迭代整个数据集
+
+```python
+collectDF.toLocalIterator()
+```
+
+### 其它方法
+
+alias或contains
+
+### 聚合操作（aggregation）
+
+### 窗口函数（window function）
+
+### 连接操作（join）
 
 ## 数据分区
 
