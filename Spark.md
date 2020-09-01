@@ -449,6 +449,16 @@ df.limit(5).show()
 df.orderBy(expr("count desc")).limit(6).show()
 ```
 
+### 替换操作
+
+```python
+# 第一个参数是替换字典
+# 第三个参数表示要替换的列
+df_immigration = df_immigration.na.replace(location_dict,1,["bornCountry","residentCountry"])
+```
+
+
+
 ### 重分区和合并
 
 另一个重要的优化是根据一些经常过滤的列对数据进行分区，控制跨群集数据的物理布局，包括分区方案和分区数
@@ -499,6 +509,14 @@ alias或contains
 ### 窗口函数（window function）
 
 ### 连接操作（join）
+
+### 列拼接（concat_ws）
+
+```python
+temp_table = df_immigration.withColumn("visa_id",md5(concat_ws('-',col("visa"),col("visaType"))))
+```
+
+
 
 ## 数据分区
 
