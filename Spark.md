@@ -516,6 +516,29 @@ alias或contains
 temp_table = df_immigration.withColumn("visa_id",md5(concat_ws('-',col("visa"),col("visaType"))))
 ```
 
+## 数据类型
+
+### BOOL类型
+
+```python 
+# in Python
+from pyspark.sql.functions import instr
+priceFilter = col("UnitPrice") > 600
+descripFilter = instr(df.Description, "POSTAGE") >= 1
+df.where(df.StockCode.isin("DOT")).where(priceFilter | descripFilter).show()
+
+# in Python
+from pyspark.sql.functions import instr
+DOTCodeFilter = col("StockCode") == "DOT"
+priceFilter = col("UnitPrice") > 600
+descripFilter = instr(col("Description"), "POSTAGE") >= 1
+df.withColumn("isExpensive", DOTCodeFilter & (priceFilter | descripFilter))\
+.where("isExpensive")\
+.select("unitPrice", "isExpensive").show(5)
+```
+
+
+
 
 
 ## 数据分区
