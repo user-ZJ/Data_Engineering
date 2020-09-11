@@ -568,3 +568,28 @@ Kafka的目的是通过[Hadoop](https://baike.baidu.com/item/Hadoop)的并行加
 
 data pipeline:是处理数据的一系列步骤
 
+
+
+
+
+
+
+## notes
+
+实时数仓肯定用flink，我做分析肯定用Spark
+
+用python写spark有个问题
+你只能用系统带着的算子
+python spark的udf接口有问题
+然后在序列化和反序列化的过程上效率奇低
+在百兆这个级别上
+如果涉及反序列化
+那运行效率比pandas还低
+然后spark python的udf接口严重依赖本地的Python环境
+在设置rpc上如果没做好版本通用性问题
+那么udf接近不可用的状态
+最轻是运算结果不可用
+最坏是环境变量配置问题把硬盘给写了
+这是在standalone下，我没试过在yarn下的情况
+Scala只要不涉及2.11 2.12这两个版本的跨版本一般没事,这两个版本二进制不兼容
+
