@@ -2,23 +2,44 @@
 ## 1. 数据工程师工具
 
 - Hadoop:分布式系统基础架构
+
 - Spark:专为大规模数据处理而设计的快速通用的计算引擎
+
 - Flink：开源流处理框架，其核心是用Java和Scala编写的分布式流数据流引擎
+
 - Python：编程语言
+
 - Scala：编程语言
+
 - Java：编程语言
+
 - C++：编程语言
+
 - AWS/Redshift：亚马逊云数据库
+
 - Azure：微软云
+
 - Kafka:开源流处理平台,是一种高吞吐量的[分布式](https://baike.baidu.com/item/分布式/19276232)发布订阅消息系统，它可以处理消费者在网站中的所有动作流数据。
+
 - Hive:基于[Hadoop](https://baike.baidu.com/item/Hadoop/3526507)的一个[数据仓库](https://baike.baidu.com/item/数据仓库/381916)工具，用来进行数据提取、转化、加载
+
+  Spark与Hive的关系:
+  Spark SQL与Hive的联系很紧密，因为Spark SQL可以与Hive metastores连接。Hivemetastore维护了Hive跨会话数据表的信息，使用Spark SQL可以连接到Hive metastore访问表的元数据，这可以在访问信息的时候减少文件列表操作带来的开销。对于从传统Hadoop环境转而使用Spark环境运行工作负载的用户来说，这很受欢迎
+
 - Pig:基于[Hadoop](https://baike.baidu.com/item/Hadoop/3526507)的一个[数据仓库](https://baike.baidu.com/item/数据仓库/381916)工具，用来进行数据提取、转化、加载
+
 - Impala:新型查询系统，它提供SQL语义，能查询存储在Hadoop的HDFS和HBase中的PB级大数据
+
 - Beam:Beam是一个先进的统一处理模型,运行在任何实现了批和流数据处理任务的执行引擎上,它是一个开源的、统一的模型，用于定义批处理和流处理数据并行处理的管道，使用一个开源的Beam SDK你可以构建一个定义管道的程序，然后，这个管道由Beam支持的分布式后端去执行，其中包括**Apache Apex、Apache Flink、Apache Spark和Google Cloud Dataflow**。
+
 - Cloudera:大数据平台
+
 - Hortonworks：大数据平台
+
 - AWS Athena：Amazon Athena 是一种交互式查询服务，可使用此服务通过标准 SQL 在 Amazon S3 中轻松分析数据
+
 - RDBMS:关系数据库管理系统（Relational Database Management System）
+
 - SQL:Structured Query Language
 
 ## 2. 数据建模
@@ -592,4 +613,7 @@ python spark的udf接口有问题
 最坏是环境变量配置问题把硬盘给写了
 这是在standalone下，我没试过在yarn下的情况
 Scala只要不涉及2.11 2.12这两个版本的跨版本一般没事,这两个版本二进制不兼容
+
+Spark目前支持三个集群管理器：一个简单的内置独立集群管理器，Apache Mesos和
+Hadoop YARN
 

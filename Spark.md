@@ -1170,15 +1170,65 @@ CREATE TEMPORARY FUNCTION myFunc AS 'com.organization.hive.udf.FunctionName'
 分区,即使拥有数千个执行器,S p a r k也只有一个执行器在处理数据。类似地,如果有多个分区,但只有一个执行器,那么S p a r k仍然只有一个执行器在处理数据,就是因为只有一个计算资源单位
 值得注意的是,当使用DataFrame时,(大部分时候)你不需要手动操作分区,只需指定数据的高级转换操作,然后Spark决定此工作如何在集群上执行
 
-## Dataset
+## Dataset:类型安全的结构化API
 
 Dataset类似于RDD，但是，它们不使用Java序列化或Kryo，而是使用专用的[Encoder](http://spark.apache.org/docs/latest/api/scala/org/apache/spark/sql/Encoder.html)对对象进行序列化以进行处理或通过网络传输。虽然编码器和标准序列化都负责将对象转换为字节，但是编码器是动态生成的代码，并使用一种格式，该格式允许Spark执行许多操作，如过滤，排序和哈希处理，而无需将字节反序列化为对象
 
 dataset只有java和scala接口
 
-## SQL
+可以定义Dataset中每一行所包含的对象。在Scala 中就是一个case类对象，它实质上定义了一种模式schema，而在Java中就是Java Bean
+
+Dataset在编译时检查类型，DataFrame在运行时检查类型
+
+当使用Dataset API 时，将Spark Row格式的每一行转换为指定的特定领域类型的对象(case类或 Java 类)。此转换会减慢操作速度，但可以提供更大的灵活性。
+
+**何时使用Dataset**
+
+你可能会想，如果在使用Dataset时损失性能，那为什么我们还要使用它们呢？有下面几个主要原因：
+• 当你要执行的操作无法使用DataFrame操作表示时。
+• 如果需要类型安全，并且愿意牺牲一定性能来实现它
+
+最流行的应用场景可能是先用DataFrame和再用Dataset的情况，这可以手动在性能和类型安全之间进行权衡。这在有些情况时是很有用的，比如当基于DataFrame执行的提取、转换和加载 (ETL) 转换作业之后，想将数据送入驱动器并使用单机库操作时，或者是当需要在Spark SQL 中执行过滤和进一步操作之前，进行每行分析的预处理转
+换操作的时候。
+
+### 创建Dataset
+
+创建Dataset有些是手动操作，要求你提前知道和定义数据schema。
+
+```java
+import org.apache.spark.sql.Encoders;
+public class Flight implements Serializable{
+String DEST_COUNTRY_NAME;
+String ORIGIN_COUNTRY_NAME;
+Long DEST_COUNTRY_NAME;
+}
+Dataset<Flight> flights = spark.read
+.parquet("/data/flight-data/parquet/2010-summary.parquet/").as(Encoders.bean(Flight.class));
+```
+
+```scala
+case class Flight(DEST_COUNTRY_NAME: String,ORIGIN_COUNTRY_NAME: String, count: BigInt)
+val flightsDF = spark.read
+.parquet("/data/flight-data/parquet/2010-summary.parquet/")
+val flights = flightsDF.as[Flight]
+//当我们实际去访问这些case class时，不需要执行任何类型强制转化，只需指定case class的属性名并返回
+flights.first.DEST_COUNTRY_NAME
+```
+
+
+
+## Spark SQL
 
 使用Spark SQL，你可以将任何DataFrame注册为数据表或视图（临时表），并使用纯SQL对它进行查询。编写SQL查询或编写DataFrame代码并不会造成性能差异，它们都会被"编译”成相同的底层执行计划。
+
+> Spark SQL 的目的是作为一个在线分析处理（OLAP）数据库，而不是在线事务处理（OLTP）数据库。这意味着Spark SQL现在还不适合执行对低延迟要求极高的查询，但是未来，Spark SQL将会支持这一点
+
+运行Spark SQL方法：
+
+1. Spark SQL CLI：./bin/spark-sql
+2. Spark的可编程SQL接口
+
+
 
 ```python
 # Register the DataFrame as a SQL temporary view
@@ -1186,7 +1236,259 @@ df.createOrReplaceTempView("people")
 
 sqlDF = spark.sql("SELECT * FROM people")
 sqlDF.show()
+# 多行查询
+spark.sql("""SELECT user_id, department, first_name FROM professors
+WHERE department IN
+(SELECT name FROM department WHERE created_date >= '2016-01-01')""")
+
+spark.read.json("/data/flight-data/json/2015-summary.json")\
+.createOrReplaceTempView("some_sql_view") # DataFrame 转换为SQL
+spark.sql("""
+SELECT DEST_COUNTRY_NAME, sum(count)
+FROM some_sql_view GROUP BY DEST_COUNTRY_NAME
+""").where("DEST_COUNTRY_NAME like 'S%'").where("`sum(count)` > 10")\
+.count() # SQL转换为DataFrame
 ```
+
+### SparkSQL Thrift JDBC/ODBC服务器
+
+Spark提供了一个 Java 数据库连接 (JDBC) 接口, 通过它你或远程程序可以连接到Spark驱动器, 以便执行Spark SQL 查询
+
+```shell 
+# 启动 JDBC/ODBC 服务器,默认情况下, 服务器监听localhost:10000
+./sbin/start-thriftserver.sh
+```
+
+### Catalog
+
+Spark SQL 中最高级别的抽象是Catalog。Catalog是一个抽象，用于存储用户数据中的元数据以及其他有用的东西，如数据库，数据表，函数和视图。
+
+### 数据表
+
+要使用Spark SQL来执行任何操作之前，首先需要定义数据表。数据表在逻辑上等同于DataFrame，因为它们都是承载数据的数据结构。我们可以执行表连接操作，执行数据表过滤操作，在数据表上执行聚合操作等各种在前几章中接触过的不同操作。
+
+数据表和DataFrame的核心区别在于：DataFrame是在编程语言范围内定义的，而数据表是在数据库中定义的。在创建表时（假定你从未更改过数据库），这个数据表将属于默认数据库
+
+在Spark 2.X 中，数据表始终是实际包含数据的，没有类似视图的临时表概念，只有视图不包含数据
+
+### Spark托管表
+
+托管表（managed table）和非托管表（unmanaged table）是很重要的概念。表存储两类重要的信息，表中的数据以及关于表的数据即元数据，Spark既可以管理一组文件的元数据也可以管理实际数据。
+
+非托管表：当定义磁盘上的若干文件为一个数据表时, 这个就是非托管表；
+
+托管表：在 DataFrame 上使用saveAsTable函数来创建一个数据表时，就是创建了一个托管表，Spark将跟踪托管表的所有相关信息
+
+### 创建表
+
+你可以从多种数据源创建表。Spark支持在SQL中重用整个Data Source API，这意味着你不需要首先定义一个表再加载数据，Spark允许你从某数据源直接创建表，从文件中读取数据时, 你甚至可以指定各种复杂的选项。
+
+```python
+CREATE TABLE flights (
+DEST_COUNTRY_NAME STRING, ORIGIN_COUNTRY_NAME STRING, count LONG)
+USING JSON OPTIONS (path '/data/flight-data/json/2015-summary.json')
+# 向表中的某些列添加注释
+CREATE TABLE flights_csv (
+DEST_COUNTRY_NAME STRING,
+ORIGIN_COUNTRY_NAME STRING COMMENT “remember, the US will be most prevalent",
+count LONG)
+USING csv OPTIONS (header true, path '/data/flight-data/csv/2015-summary.csv')
+# 从查询结果创建表
+CREATE TABLE flights_from_select USING parquet AS SELECT * FROM flights
+```
+
+这些表可以在整个Spark会话中使用，而临时表不存在Spark中，所以必须创建临时的视图
+
+### 创建外部表
+
+```python
+CREATE EXTERNAL TABLE hive_flights (
+DEST_COUNTRY_NAME STRING, ORIGIN_COUNTRY_NAME STRING, count LONG)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' LOCATION '/data/flight-data-hive/'
+
+CREATE EXTERNAL TABLE hive_flights_2
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+LOCATION '/data/flight-data-hive/' AS SELECT * FROM flights
+```
+
+### 插入表
+
+插入操作遵循标准 SQL 语法。
+
+如果想要只写入某个分区, 可以选择提供分区方案。请注意, 写操作也将遵循分区模式（可能导致上述查询运行相当缓慢），它将其他文件只添加到最后的分区中
+
+```python
+INSERT INTO partitioned_flights
+PARTITION (DEST_COUNTRY_NAME="UNITED STATES")
+SELECT count, ORIGIN_COUNTRY_NAME FROM flights
+WHERE DEST_COUNTRY_NAME='UNITED STATES' LIMIT 12
+```
+
+### 描述表的元数据
+
+```python
+DESCRIBE TABLE flights_csv
+SHOW PARTITIONS partitioned_flights
+```
+
+### 刷新表元数据
+
+```python
+REFRESH table partitioned_flights
+MSCK REPAIR TABLE partitioned_flights
+```
+
+### 删除表
+
+```python
+DROP TABLE IF EXISTS flights_csv;
+```
+
+### 删除非托管表
+
+如果要删除非托管表 (例如，hive_flights), 则不会删除数据, 但你将无法再按表名引用此数据。
+
+### 缓存表
+
+```python
+CACHE TABLE flights
+UNCACHE TABLE FLIGHTS
+```
+
+### 视图
+
+视图即指定基于现有表的一组转换操作，基本上只是保存查询计划, 这可以方便地组织或重用查询逻辑。Spark有几种不同的视图概念:
+
+* 全局视图
+* 针对某个数据库的视图
+* 针对每某会话的视图
+
+视图等同于从现有DataFrame创建新的DataFrame
+
+```python
+# 创建视图
+CREATE VIEW just_usa_view AS
+SELECT * FROM flights WHERE dest_country_name = 'United States'
+# 创建仅在当前会话期间可用，且未注册到数据库的临时视图
+CREATE TEMP VIEW just_usa_view_temp AS
+SELECT * FROM flights WHERE dest_country_name = 'United States'
+# 全局临时视图 与具体database无关，在会话结束时会删除它们
+CREATE GLOBAL TEMP VIEW just_usa_global_view_temp AS
+SELECT * FROM flights WHERE dest_country_name = 'United States'
+# 覆盖视图（如果已存在）
+CREATE OR REPLACE TEMP VIEW just_usa_view_temp AS
+SELECT * FROM flights WHERE dest_country_name = 'United States'
+# 删除视图
+DROP VIEW IF EXISTS just_usa_view;
+```
+
+### 数据库
+
+数据库是组织数据表的工具。如果没有一个提前定义好的数据库，Spark将使用默认的数据库。在Spark中执行的SQL语句（包括DataFrame命令）都在数据库的上下文中执行。这意味着，如果更改数据库，那么用户定义的表都将保留在先前的数据库中，并且需要以不同的方式进行查询
+
+选择数据库之后，所有的查询都会将表名解析为该数据库中的表名。原本正常的查询可能会失败或产生不正确的结果，这很可能是因为你位于其他数据库下
+
+```python
+# 查看数据库
+SHOW DATABASES
+# 创建数据库
+CREATE DATABASE some_db
+# 选择数据库
+USE some_db
+# 使用前缀来标识数据库进行查询
+SELECT * FROM default.flights
+# 查看当前正在使用的数据库
+SELECT current_database()
+# 切换回默认数据库
+USE default;
+# 删除数据库
+DROP DATABASE IF EXISTS some_db;
+```
+
+### 复杂类型
+
+Spark SQL中支持了三种复杂类型：结构体（struct），列表（list）和映射(map)
+
+#### 结构体
+
+```python
+CREATE VIEW IF NOT EXISTS nested_data AS
+SELECT (DEST_COUNTRY_NAME, ORIGIN_COUNTRY_NAME) as country, count FROM flights
+SELECT * FROM nested_data
+SELECT country.DEST_COUNTRY_NAME, count FROM nested_data
+SELECT country.*, count FROM nested_data
+```
+
+#### 列表
+
+collect_list创建一个包含值的列表；collect_set创建一个不含有重复值的列表
+
+```python
+SELECT DEST_COUNTRY_NAME as new_name, collect_list(count) as flight_counts,
+collect_set(ORIGIN_COUNTRY_NAME) as origin_set
+FROM flights GROUP BY DEST_COUNTRY_NAME
+# 设定值方法来创建数组
+SELECT DEST_COUNTRY_NAME, ARRAY(1, 2, 3) FROM flights
+# 按位置查询列表
+SELECT DEST_COUNTRY_NAME as new_name, collect_list(count)[0] FROM flights GROUP BY
+DEST_COUNTRY_NAME
+# 将数组转换回行的操作
+CREATE OR REPLACE TEMP VIEW flights_agg AS
+SELECT DEST_COUNTRY_NAME, collect_list(count) as collected_counts
+FROM flights GROUP BY DEST_COUNTRY_NAME
+SELECT explode(collected_counts), DEST_COUNTRY_NAME FROM flights_agg
+```
+
+#### 函数
+
+SHOW FUNCTIONS		查看SparkSQL 中的函数列表
+
+SHOW SYSTEM FUNCTIONS		查询系统函数（即Spark内置函数）
+
+SHOW USER FUNCTIONS			查询用户函数
+
+SHOW FUNCTIONS "s*";			  以 "s" 开头的所有函数
+
+SHOW FUNCTIONS LIKE "collect*";		
+
+DESCRIBE关键字, 它返回特定函数的文档
+
+### 子查询
+
+在其他查询中指定子查询，这使得你可以在 SQL 中指定一些复杂的逻辑。
+
+相关子查询（Correlated Subquery）使用来自查询外的一些信息。
+
+不相关子查询（Uncorrelated Subquery）不包括外部的信息。每个查询都可以返回单个值（标量查询Scalar Subquery）或多个值
+
+Spark还包括对谓词子查询（Predicate Subquery）的支持，它允许基于值进行筛选。
+
+* 不相关谓词子查询
+
+```python
+SELECT * FROM flights WHERE origin_country_name IN (SELECT dest_country_name FROM flights
+GROUP BY dest_country_name ORDER BY sum(count) DESC LIMIT 5)
+```
+
+* 相关谓词子查询
+
+```python
+SELECT * FROM flights f1
+WHERE EXISTS (SELECT 1 FROM flights f2
+WHERE f1.dest_country_name = f2.origin_country_name)
+AND EXISTS (SELECT 1 FROM flights f2
+WHERE f2.dest_country_name = f1.origin_country_name)
+```
+
+* 不相关标量查询
+
+使用不相关的标量查询scalar query, 可以引入一些以前可能没有的补充信息。例如, 如果希望将最大值包含在整个计数数据集中作为其自己的列, 则可以执行以下操作
+
+```python
+SELECT *, (SELECT max(count) FROM flights) AS maximum FROM flights
+```
+
+
 
 ## 操作
 
@@ -1523,10 +1825,10 @@ Parquet对象可用的选项以及说明
 - **recursiveFileLookup** –递归扫描目录中的文件。使用此选项将禁用[分区发现](https://spark.apache.org/docs/latest/sql-data-sources-parquet.html#partition-discovery)。
 
 ```python
-spark.read.format(“parquet")\
-.load(“/data/flight-data/parquet/2010-summary.parquet").show(5)
-csvFile.write.format(“parquet").mode(“overwrite")\
-.save(“/tmp/my-parquet-file.parquet")
+spark.read.format("parquet")\
+.load("/data/flight-data/parquet/2010-summary.parquet").show(5)
+csvFile.write.format("parquet").mode("overwrite")\
+.save("/tmp/my-parquet-file.parquet")
 ```
 
 ### 读写ORC文件
@@ -1545,7 +1847,87 @@ csvFile.write.format("orc").mode("overwrite").save("/tmp/my-json-file.orc")
 
 读写这些数据库需要两步：在Spark类路径中为指定的数据库包含Java Database Connectivity（JDBC）驱动，并为连接驱动器提供合适的JAR包。
 
+```python
+driver = "org.sqlite.JDBC"
+path = "/data/flight-data/jdbc/my-sqlite.db"
+url = "jdbc:sqlite:" + path
+tablename = "flight_info"
+# S Q L i t e
+dbDataFrame = spark.read.format("jdbc").option("url", url)\
+.option("dbtable", tablename).option("driver", driver).load()
+# pgsql
+pgDF = spark.read.format("jdbc")\
+.option("driver", "org.postgresql.Driver")\
+.option("url", "jdbc:postgresql://database_server")\
+.option("dbtable", "schema.tablename")\
+.option("user", "username").option("password", "my-secret-password").load()
 
+pushdownQuery = """(SELECT DISTINCT(DEST_COUNTRY_NAME) FROM flight_info)
+AS flight_info"""
+dbDataFrame = spark.read.format("jdbc")\
+.option("url", url).option("dbtable", pushdownQuery).option("driver", driver)\
+.load()
+# numPartitions
+dbDataFrame = spark.read.format("jdbc")\
+.option("url", url).option("dbtable", tablename).option("driver", driver)\
+.option("numPartitions", 10).load()
+
+newPath = "jdbc:sqlite://tmp/my-sqlite.db"
+csvFile.write.jdbc(newPath, tablename, mode="overwrite", properties=props)
+csvFile.write.jdbc(newPath, tablename, mode="append", properties=props)
+```
+
+### 文本文件
+
+Spark还支持读取纯文本文件，文件中的每一行将被解析为DataFrame 中的一条记录，然后根据你的要求进行转换
+
+```python
+spark.read.textFile("/data/flight-data/csv/2010-summary.csv")
+.selectExpr("split(value, ',') as rows").show()
+csvFile.limit(10).select("DEST_COUNTRY_NAME", "count")\
+.write.partitionBy("count").text("/tmp/five-csv-files2py.csv")
+```
+
+### 并行读数据
+
+多个执行器不能同时读取同一文件，但可以同时读取不同的文件。通常，这意味着当你从包含多个文件的文件夹中读取时，每个文件都将被视为DataFrame的一个分片，并由执行器并行读取，多余的文件会进入读取队列等候
+
+### 并行写数据
+
+写数据涉及的文件数量取决于DataFrame的分区数。默认情况是每个数据分片都会有一定的数据写入，这意味着虽然我们指定的是一个"文件”，但实际上它是由一个文件夹中的多个文件组成，每个文件对应着一个数据分片
+
+### 数据划分
+
+数据划分工具支持你在写入数据时控制存储什么数据以及存储数据的位置。将文件写出时，你可以将列编码为文件夹，这使得你在之后读取时可跳过大量数据，只读入与问题相关的列数据而不必扫描整个数据集。所有基于文件的数据源都支持这些
+
+```python
+csvFile.limit(10).write.mode("overwrite").partitionBy("DEST_COUNTRY_NAME")\
+.save("/tmp/partitioned-files.parquet")
+```
+
+读取程序对某表执行操作之前经常执行过滤操作，这时数据划分就是最简单的优化。例如，基于日期来划分数据最常见，因为通常我们只想查看前一周的数据（而不是扫描所有日期数据），这个优化可以极大提升读取程序的速度
+
+### 数据分桶
+
+数据分桶是另一种文件组织方法，你可以使用该方法控制写入每个文件的数据。具有相同桶 ID （哈希分桶的ID）的数据将放置到一个物理分区中，这样就可以避免在稍后读取数据时进行shuffle（洗牌）。根据你之后希望如何使用该数据来对数据进行预分区，就可以避免连接或聚合操作时执行代价很大的shuffle操作
+
+与其根据某列进行数据划分，不如考虑对数据进行分桶，因为某列如果存在很多不同的值，就可能写出一大堆目录。这将创建一定数量的文件，数据也可以按照要求组织起来放置到这些"桶”中：
+
+```python
+val numberBuckets = 10
+val columnToBucketBy = "count"
+csvFile.write.format("parquet").mode("overwrite")
+.bucketBy(numberBuckets, columnToBucketBy).saveAsTable("bucketedFiles")
+```
+
+### 管理文件大小
+
+管理文件大小对数据写入不那么重要，但对之后的读取很重要。当你写入大量的小文件时，由于管理所有的这些小文件而产生很大的元数据开销。许多文件系统（如HDFS）都不能很好地处理大量的小文件，而Spark特别不适合处理小文件。也不希望文件太大，因为当你只需要其中几行时，必须读取整个数据块就会使效率低下。
+
+可以使用maxRecordsPerFile选项来指定每个文件的最大记录数，这使得你可以通过控制写入每个文件的记
+录数来控制文件大小。例如，如果你将写程序（wri t e r）的选项设置为
+
+df.write.option("maxRecordsPerFile”，5000），Spark将确保每个文件最多包含5000条记录。
 
 ## spark-submit
 
@@ -1561,10 +1943,175 @@ spark-submit提供了若干控制选项，你可以指定应用程序需要的�
 ./examples/src/main/python/pi.py 10
 ```
 
-## Dataset：类型安全的结构化API
+## 低级API
 
-Dataset，用于在Java和Scala中编写静态类型的代码。Dataset API在Python和R中不可用，因为这些语
-言是动态类型的。
+当高级API无法解决遇到的业务或工程问题的时候，就需要使用Spark的低级API，特别是弹性分布式数据集（RDD）、SparkContext和分布式共享变量（例如累加器和广播变量）
 
-**暂时跳过**
+有两种低级API：一种用于处理分布式数据（RDD），另一种用于分发和处理分布式共享变量（广播变量和累加器）。
+
+下列三种场景，通常需使用到低级API：
+• 当在高级API中找不到所需的功能时，例如要对集群中数据的物理放置进行非常严格的控制时。
+• 当需要维护一些使用RDD编写的遗留代码库时。
+
+• 当需要执行一些自定义共享变量操作时。
+
+SparkContext是低级API函数库的入口，可以通过SparkSession来获取SparkContext，SparkSession是用于在Spark集群上执行计算的工具
+
+## RDD(弹性分布式数据集)
+
+RDD是Spark 1.X系列中主要的API，在2.X系列中仍然可以使用它，但是已不常用
+
+简单来说，RDD是一个只读不可变的且已分块的记录集合，并可以被并行处理
+
+RDD与 DataFrame不同，DataFrame中每个记录即是一个结构化的数据行，各字段已知且schema已知，而 RDD中的记录仅仅是程序员选择的Java、Scala 或 Python 对象。
+
+正因为RDD中每个记录仅仅是一个Java或 Python 对象，因此能完全控制RDD，即能以任何格式在这些对象中存储任何内容。这使你具有很大的控制权，同时也带来一些潜在问题。比如，值之间的每个操作和交互都必须手动定义，也就是说，无论实现什么任务，都必须从底层开发。另外，因为Spark不像对结构化API那样清楚地理解记录
+的内部结构，所以往往需要用户自己写优化代码。比如，Spark的结构化API会自动以优化后的二进制压缩格式存储数据，而在使用低级API时，为了实现同样的空间效率和性能，你就需要在对象内部实现这种压缩格式，以及针对该格式进行计算的所有低级操作。同样，像重排过滤和聚合等这类SparkSQL中自动化的优化操作，也需要你
+手动实现。因此，强烈建议尽可能使用Spark结构化API
+
+在 RDD和Dataset之间来回转换的代价很小，因此可以同时使用两种API来取长补短
+
+### RDD类型
+
+作为用户，一般只会创建两种类型的RDD：**“通用”型RDD**或**提供附加函数的key-value RDD**；key-value
+RDD支持特殊操作并支持按key的自定义数据分片
+
+现在来正式定义RDD。每个RDD具有以下五个主要内部属性：
+
+* 数据分片（Partition）列表。
+* 作用在每个数据分片的计算函数。
+* 描述与其他RDD的依赖关系列表。
+*  (可选)为key-value RDD配置的Partitioner(分片方法，如hash分片）。
+*  (可选)优先位置列表，根据数据的本地特性，指定了每个Partition分片的处理位置偏好（例如，对于一个HDFS文件来说，这个列表就是每个文件块所在的节点）。
+
+这些属性决定了Spark的所有调度和执行用户程序的能力，不同RDD都各自实现了上述的每个属性，并允许你定义新的数据源。
+
+RDD API支持Python，Scala和Java。对于Scala和Java而言，其性能基本是相同的，主要的性能开销花费在处理原始对象上。但对于Python来说，使用RDD会极大地影响性能，运行Python RDD等同于逐行运行用户定义的Python函数（UDF）。
+
+### 何时使用RDD？
+
+一般来说，除非有非常非常明确的理由，否则不要手动创建RDD。它们是很低级的API，虽然它提供了大量的功能，但同时缺少结构化API中可用的许多优化。在绝大多数情况下，DataFrame比RDD更高效、更稳定并且具有更强的表达能力。
+当你需要对数据的物理分布进行细粒度控制（自定义数据分区）时，可能才需要使用RDD。  
+
+### 使用Case Class转换的RDD和Dataset的区别是什么？
+
+不同之处在于，虽然它们可以执行同样的功能，但是Dataset可以利用结构化API提供的丰富功能和优化，无需选择是在JVM类型还是Spark类型上进行操作。你可以采用其中最简单或最灵活的方式，这样就有了两全其美之法。
+
+## 分布式共享变量
+
+Spark的第二种低级 API 是“分布式共享变量”。它包括两种类型：广播变量（broadcast variable）和累加器（accumulator）
+
+广播变量允许你在所有工作节点上保存一个共享值，当在Spark各种操作中重用它时，就不需要将其重新在机器间传输。广播变量是共享的、不可修改的变量，它们缓存在集群中的每个节点上，而不是在每个任务中都反复序列化
+
+```python
+my_collection = "Spark The Definitive Guide : Big Data Processing Made Simple".split(" ")
+words = spark.sparkContext.parallelize(my_collection, 2)
+supplementalData = {"Spark":1000, "Definitive":200,
+"Big":-300, "Simple":100}
+suppBroadcast = spark.sparkContext.broadcast(supplementalData)
+suppBroadcast.value
+words.map(lambda word: (word, suppBroadcast.value.get(word, 0)))\
+.sortBy(lambda wordPair: wordPair[1])\
+.collect()
+```
+
+既可以在RDD中使用广播变量，也可以是在UDF或Dataset中使用广播变量，都将获得相同的结果
+
+
+
+累加器将所有任务中的数据累加到一个共享结果中（例如，实现一个计数器，以便可以查看有多少输入记录无法解析);它用于将转换操作更新的值以高效和容错的方式传输到驱动节点
+
+累加器提供一个累加用的变量，Spark集群可以以按行方式对其进行安全更新，你可以用它来进行调试(例如，跟踪每个分区中某个变量的值) 或创建低级聚合。累加器仅支持由满足交换律和结合律的操作进行累加的变量，因此对累加器的操作可以被高效并行，你可以使用累加器实现计数器 (如 MapReduce) 或求和操作。Spark提供对数字类型累加器的原生支持，程序员可以自行添加对新类型的支持。
+
+```scala
+import org.apache.spark.util.LongAccumulator
+val accUnnamed = new LongAccumulator
+val acc = spark.sparkContext.register(accUnnamed)
+
+val accChina = new LongAccumulator
+val accChina2 = spark.sparkContext.longAccumulator("China")
+spark.sparkContext.register(accChina，"China")
+
+def accChinaFunc(flight_row: Flight) = {
+	val destination = flight_row.DEST_COUNTRY_NAME
+	val origin = flight_row.ORIGIN_COUNTRY_NAME
+	if (destination == "China") {
+		accChina.add(flight_row.count.toLong)
+	}
+	if (origin == "China") {
+		accChina.add(flight_row.count.toLong)
+	}
+}
+
+flights.foreach(flight_row => accChinaFunc(flight_row))
+accChina.value
+```
+
+
+
+
+
+SparkSession:任何Spark应用程序的第一步都是创建一个SparkSession。在交互模式中，通常已经为你预先创建了，但在应用程序中你必须自己创建。
+
+一些老旧的代码可能会使用new SparkContext这种方法创建，但是应该尽量避免使用，这种方法，而是推荐使用SparkSession的构建器方法，该方法可以更稳定地实例化Spark和SQL Context，并确保没有多线程切换导致的上下文冲突，因为可能有多个库试图在相同的Spark应用程序中创建会话
+
+SparkContext:SparkSession中的SparkContext对象代表与Spark集群的连接，可以通过它与一些Spark的低级API（如RDD）进行通信，在较早的示例和文档中，它通常以变量名sc存储。通过SparkContext，你可以创建RDD、累加器和广播变量，并且可以在集群上运行代码
+
+大多数情况下，你不需要显式初始化SparkContext，你应该可以通过SparkSession来访问它。如果你想要，一般来说你可以通过getOrCreate方法来创建它
+
+
+
+**阶段**
+
+Spark中的阶段（stage）代表可以一起执行的任务组，用以在多台机器上执行相同的操作。。一般来说，Spark会尝试将尽可能多的工作（即作业内部尽可能多的转换操作）加入同一个阶段，但引擎在shuffle操作之后启动新的阶段。。一次shuffle操作意味着一次对数据的物理重分区，例如对DataFrame进行排序，或对从文件中加载的数据按key进行分组（这要求将具有相同key的记录发送到同一节点），这种重分区需要跨执行器的协调来移动数据。Spark在每次shuffle之后开始一个新阶段，并按照顺序执行各阶段以计算最终结果。
+
+spark.conf.set("spark.sql.shuffle.partitions"，50)
+
+**任务**
+
+Spark中的阶段由若干任务（task）组成，每个任务都对应于一组数据和一组将在单个执行器上运行的转换操作。如果数据集中只有一个大分区，我们将只有1个任务；如果有1000个小分区，我们将有1000个可以并行执行的任务。任务是应用于每个数据单元（分区）的计算单位，将数据划分为更多分区意味着可以并行执行更多分区。虽然可以通过增加分区数量来增加并行性，但这不是万能的，只是可以通过这一点来做一些简单的优化。
+
+
+
+Spark会自动的以流水线的方式一并完成连续的阶段和任务，例如map操作接着另一个map操作
+
+对于所有的shuffle操作，Spark会将数据写入持久化存储（例如磁盘），并可以在多个作业中重复使用它。
+
+当Spark需要运行某些需要跨节点移动数据的操作时，例如按键约减操作（即reduce-by-key操作，其中每个键对
+应的输入数据需要先从多个节点获取并合并在一起），处理引擎不再执行流水线操作，而是执行跨网络的shuffle操作。在Spark执行shuffle操作时，总是首先让前一阶段的“源”任务（发送数据的那些任务）将要发送的数据写入到本地磁盘的shuffle文件上，然后下一阶段执行按键分组和约减的任务将从每个shuffle文件中获取相应的记
+录并执行某些计算任务（例如，获取并处理特定键范围的数据）。将shuffle文件持久化到磁盘上允许Spark稍晚些执行reduce阶段的某些任务（例如，如果没有足够多的执行器同时执行分配任务，由于数据已经持久化到磁盘上，便可以稍晚些执行某些任务），另外在错误发生时，也允许计算引擎仅重新执行reduce任务而不必重新启动所有的输入任务
+
+
+
+
+
+
+
+提交应用程序时，可以提交.py文件，然后通过--py-files选项指定将后缀名为.zip，.egg和.py的文件添加到搜索路径中
+
+shell的可执行器：spark-shell（用于Scala），spark-sql，pyspark和sparkR
+
+如果要提交到集群上运行，那么使用spark-submit命令是最合适的
+
+**Spark-submit命令选项**
+
+| Parameter                 | Description                                                  |
+| ------------------------- | ------------------------------------------------------------ |
+| --master MASTER_URL       | 指定master节点URL，例如spark：//host：port，mesos：//<br/>host：port，yarn，or local |
+| --deploy-mode DEPLOY_MODE | 配置是在本地以客户端模式 (“client”) 还是在一台集群中节<br/>点上以集群模式(“cluster”)运行应用程序 (默认使用客户端模式) |
+| --class CLASS_NAME        | 配置应用程序的入口类 (main函数所在的类，适合 Java / Scala<br/>应用) |
+| --name NAME               | 配置应用程序的名字                                           |
+| --jars JARS               | 配置驱动器或者执行器路径上包括的本地jar包，用逗号隔开        |
+| --packages                | 配置驱动器或者执行器路径上包括的Maven依赖包，用逗号<br/>隔开。将会首先搜索本地Maven版本库（repo），然后搜索<br/>Maven Central及远程版本库（远程repo通过--repositories选项<br/>指定）。依赖软件包的格式是groupId：artifactId：version |
+| --exclude-packages        | 为了避免依赖冲突，配置排除在--packages选项中指定的依赖<br/>包，通过逗号隔开，格式是：artifactId |
+| --repositories            | 配置除了通过--packages指定的，其他的Maven远程依赖库，<br/>通过逗号隔开 |
+| --py-files PY_FILES       | 配置Python应用程序需要的.zip、.egg或者.py文件（即放在<br/>PYTHONPATH路径上的文件），用逗号隔开 |
+| --files FILES             | 配置在每个执行器工作目录路径下的文件，用逗号隔开             |
+| --conf PROP=VALUE         | 配置Spark属性                                                |
+| --properties-file FILE    | 配置需要从哪个文件加载额外的属性，默认是c o n f/s p a r kdefaults.<br/>conf |
+| --driver-memory MEM       | 配置驱动器的内存大小（例如，1000MB，2GB）（默认：<br/>1024MB） |
+| --driver-java-options     | 配置驱动器的Java参数                                         |
+| --driver-class-path       | 配置驱动器的classpath。注意，通过--jars添加的JAR包已经自<br/>动包含在classpath里了 |
+| --executor-memory MEM     | 配置执行器的内存大小（例如，1000MB，2GB）（默认：1024MB）    |
+| --proxy-user NAME         | 配置提交应用程序时的代理用户，在配置了--principal/--keytab<br/>选项时，这个配置不生效 |
 
