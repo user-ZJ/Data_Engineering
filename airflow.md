@@ -1,6 +1,6 @@
 # DAGs（Directed Acyclic Graphs）
 
-- **有向无环图（DAG）：** DAG是图的特殊子集，其中节点之间的边具有特定方向，并且不存在循环。当我们说“不存在周期”时，我们的意思是节点无法创建返回自己的路径。
+- **有向无环图（DAG）：** DAG是图的特殊子集，其中节点之间的边具有特定方向，并且不存在循环。当我们说"不存在周期"时，我们的意思是节点无法创建返回自己的路径。
 - **节点：**数据管道流程中的一个步骤。
 - **边缘：**节点之间的依赖关系或其他关系。
 
@@ -12,7 +12,32 @@
 - 可构建任务依赖：以有向无环图的方式构建任务依赖关系
 - task原子性：工作流上每个task都是原子可重试的，一个工作流某个环节的task失败可自动或手动进行重试，不必从头开始任务
 
+## Airflow quickstart
 
+```shell
+export AIRFLOW_HOME=~/airflow
+
+pip install apache-airflow
+
+airflow initdb
+
+#!/bin/bash
+# Start airflow
+airflow scheduler --daemon
+airflow webserver --daemon -p 3000
+
+# Wait till airflow web-server is ready
+echo "Waiting for Airflow web server..."
+while true; do
+  _RUNNING=$(ps aux | grep airflow-webserver | grep ready | wc -l)
+  if [ $_RUNNING -eq 0 ]; then
+    sleep 1
+  else
+    echo "Airflow web server is ready"
+    break;
+  fi
+done
+```
 
 ## Airflow DAG的操作顺序
 
@@ -30,34 +55,35 @@ Airflow UI是用户和维护者的控制界面，允许他们执行和监视DAG
 ```python
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
+import datetime
 divvy_dag = DAG(
     'divvy',
     description='Analyzes Divvy Bikeshare Data',
     #start_date=datetime(2019, 2, 4),  #开始日期
     start_date=datetime.datetime.now() - datetime.timedelta(days=2),
-    end_date=datetime(2019, 5, 4),
+    end_date=datetime.datetime(2019, 5, 4),
     schedule_interval='@daily',# 时间间隔
     max_active_runs=1    #最多同时执行1个flow
 )  
 
 def hello_world():
-    print(“Hello World”)
+    print("Hello World")
     
 def goodbye_world():
-    print(“Goodbye”)
+    print("Goodbye")
 
 hello_world_task  = PythonOperator(
-    task_id=’hello_world_task’,
+    task_id='hello_world_task',
     python_callable=hello_world,
     dag=divvy_dag)
 goodbye_world_task  = PythonOperator(
-    task_id=’goodbye_world_task’,
+    task_id='goodbye_world_task',
     python_callable=goodbye_world,
     dag=divvy_dag)
 #hello_world_task >> goodbye_world_task
 #或
 hello_world_task.set_downstream(goodbye_world_task)
-# 时间表是可选的，可以使用cron字符串或“ariflow预设”定义。气流提供以下预设：
+# 时间表是可选的，可以使用cron字符串或"ariflow预设"定义。气流提供以下预设：
 # @once -一次运行DAG，然后不再运行
 # @hourly -每小时运行DAG
 # @daily -每天运行DAG
@@ -101,11 +127,11 @@ from airflow.operators.python_operator import PythonOperator
 
 def load():
 # Create a PostgresHook option using the `demo` connection
-    db_hook = PostgresHook(‘demo’)
+    db_hook = PostgresHook(‘demo')
     df = db_hook.get_pandas_df('SELECT * FROM rides')
     print(f'Successfully used PostgresHook to return {len(df)} records')
 
-load_task = PythonOperator(task_id=’load’, python_callable=hello_world, ...)
+load_task = PythonOperator(task_id='load', python_callable=hello_world, ...)
 ```
 
 ## [**context variables**](https://airflow.apache.org/macros.html) 
@@ -117,11 +143,11 @@ from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 
 def hello_date(*args, **kwargs):
-    print(f“Hello {kwargs[‘execution_date’]}”) #运行的时间点
+    print(f"Hello {kwargs[‘execution_date']}") #运行的时间点
 
 divvy_dag = DAG(...)
 task = PythonOperator(
-    task_id=’hello_date’,
+    task_id='hello_date',
     python_callable=hello_date,
     provide_context=True,
     dag=divvy_dag)
