@@ -39,6 +39,26 @@ while true; do
 done
 ```
 
+重启airflow
+
+```shell
+# 重启webserver和scheduler
+ps -ef|egrep 'scheduler|airflow-webserver'|grep -v grep|awk '{print $2}'|xargs kill -9
+rm -rf ~/airflow/airflow-scheduler.pid 
+airflow scheduler --daemon
+airflow webserver --daemon -p 3000
+tail -f ~/airflow/airflow-scheduler.err 
+# 重启worker
+ps -ef|egrep 'serve_logs|celeryd'|grep -v grep
+rm -rf ~/airflow/airflow-worker.pid
+airflow worker -D
+tail -f ~/airflow/airflow-worker.err   #什么也不打印就是没有问题
+# 重启电脑后webserver启动不了问题
+rm -rf ~/airflow/airflow-scheduler.pid
+```
+
+
+
 ## Airflow DAG的操作顺序
 
 - Airflow Scheduler根据时间或外部触发器启动DAG。
