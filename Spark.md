@@ -1929,19 +1929,7 @@ csvFile.write.format("parquet").mode("overwrite")
 
 df.write.option("maxRecordsPerFile”，5000），Spark将确保每个文件最多包含5000条记录。
 
-## spark-submit
 
-spark-submit轻松地将测试级别的交互式程序转化为生产级别的应用程序。sparksubmit将你的应用程序代码发送到一个集群并在那里执行，应用程序将一直运行，直到它（完成任务后）正确退出或遇到错误。你的程序可以在集群管理器的支持下进行，包括Standalone，Mesos和YARN等。
-
-spark-submit提供了若干控制选项，你可以指定应用程序需要的资源，以及应用程序的运行方式和运行参数等
-
-你可以使用Spark支持的任何语言编写应用程序，然后提交它执行
-
-```python
-./bin/spark-submit \
---master local \
-./examples/src/main/python/pi.py 10
-```
 
 ## 低级API
 
@@ -2085,13 +2073,27 @@ Spark会自动的以流水线的方式一并完成连续的阶段和任务，例
 
 
 
-
+## spark-shell
 
 提交应用程序时，可以提交.py文件，然后通过--py-files选项指定将后缀名为.zip，.egg和.py的文件添加到搜索路径中
 
 shell的可执行器：spark-shell（用于Scala），spark-sql，pyspark和sparkR
 
 如果要提交到集群上运行，那么使用spark-submit命令是最合适的
+
+## spark-submit
+
+spark-submit轻松地将测试级别的交互式程序转化为生产级别的应用程序。sparksubmit将你的应用程序代码发送到一个集群并在那里执行，应用程序将一直运行，直到它（完成任务后）正确退出或遇到错误。你的程序可以在集群管理器的支持下进行，包括Standalone，Mesos和YARN等。
+
+spark-submit提供了若干控制选项，你可以指定应用程序需要的资源，以及应用程序的运行方式和运行参数等
+
+你可以使用Spark支持的任何语言编写应用程序，然后提交它执行
+
+```python
+./bin/spark-submit \
+--master local \
+./examples/src/main/python/pi.py 10
+```
 
 **Spark-submit命令选项**
 
@@ -2114,4 +2116,21 @@ shell的可执行器：spark-shell（用于Scala），spark-sql，pyspark和spar
 | --driver-class-path       | 配置驱动器的classpath。注意，通过--jars添加的JAR包已经自<br/>动包含在classpath里了 |
 | --executor-memory MEM     | 配置执行器的内存大小（例如，1000MB，2GB）（默认：1024MB）    |
 | --proxy-user NAME         | 配置提交应用程序时的代理用户，在配置了--principal/--keytab<br/>选项时，这个配置不生效 |
+
+**部署相关配置**
+
+| Cluster Managers | Modes   | Conf                       | Description                                                  |
+| ---------------- | ------- | -------------------------- | ------------------------------------------------------------ |
+| Standalone       | Cluster | --driver-cores NUM         | 驱动器的核心数量(默认:1)                                     |
+| Standalone/Mesos | Cluster | --supervise                | 失败后重新启动驱动器                                         |
+| Standalone/Mesos | Cluster | --kill SUBMISSION_ID       | 杀掉指定驱动器进程                                           |
+| Standalone/Mesos | Cluster | --status SUBMISSION_ID     | 获取指定驱动器的状态                                         |
+| Standalone/Mesos | Either  | --total-executor-cores NUM | 所有执行器的总核心数                                         |
+| Standalone/YARN  | Either  | --executor-cores NUM1      | 每个执行器的核心数 ( 默认:YA R N 模式下为 1 ,或在<br/>standalone模式下worker节点的所有可用核心数) |
+| YARN             | Either  | --driver-cores NUM         | 集群模式下的驱动器的核心数(默认:1)                           |
+| YARN             | Either  | queue QUEUE_NAME           | 提 交 到 YA R N 的 队 列 名 ( 默认:“default”)                |
+| YARN             | Either  | --num-executors NUM        | 启动的执行器(默认:2)。如<br/>果配置了动态分配,那么初始       |
+| YARN             | Either  | --archives ARCHIVES        | 需要提取到每个执行器工作目<br/>录下的archive,用逗号分隔      |
+| YARN             | Either  | --principal PRINCIPAL      | 当运行安全H D F S时,登录到<br/>KDC用到的原则                 |
+| YARN             | Either  | --keytab KEYTAB            | 包含上面指定 p r i n c i p a l 的<br/>k e y t a b的完整路径,k e y t a b将<br/>会通过Distributed Cache被复制<br/>到执行应用程序的m a s t e r节点<br/>上,为定期更新登录口令使用 |
 

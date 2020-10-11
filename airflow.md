@@ -55,6 +55,13 @@ airflow worker -D
 tail -f ~/airflow/airflow-worker.err   #什么也不打印就是没有问题
 # 重启电脑后webserver启动不了问题
 rm -rf ~/airflow/airflow-scheduler.pid
+# 隐藏 airflow 自带的 dag 样例
+vim airflow/airflow.cfg
+load_examples = False
+
+airflow resetdb -y
+### 指定 dag_id，逐个删除 dag 
+airflow delete_dag example_dag_to_delete
 ```
 
 
