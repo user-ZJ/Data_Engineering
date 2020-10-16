@@ -2134,3 +2134,103 @@ spark-submit提供了若干控制选项，你可以指定应用程序需要的�
 | YARN             | Either  | --principal PRINCIPAL      | 当运行安全H D F S时,登录到<br/>KDC用到的原则                 |
 | YARN             | Either  | --keytab KEYTAB            | 包含上面指定 p r i n c i p a l 的<br/>k e y t a b的完整路径,k e y t a b将<br/>会通过Distributed Cache被复制<br/>到执行应用程序的m a s t e r节点<br/>上,为定期更新登录口令使用 |
 
+## spark配置
+
+spark配置选项分为以下几类：
+
+应用程序属性；运行时环境；shuffle行为；Spark UI；压缩和序列化；内存管理； 执行行为；网络； 调度；动态分配；安全；加密；Spark SQL；Spark流处理；SparkR。
+
+通过三种手段配置Spark系统：1.通过Spark属性可以控制大多数应用程序参数，可以通过SparkConf对象进行设
+置。2. Java属性配置。3.硬编码的配置文件。
+
+在Spark根目录下的/conf目录中包含了一些属性配置模板，你可以将这些属性设置为应用程序的硬编码变量，或者在运行时指定它们。你可以使用环境变量配置每个节点的属性，例如可以通过conf / spark-env.sh脚本来配置每个节点的IP地址。另外，你可以通过log4j.properties配置日志记录属性。
+
+### SparkConf
+
+SparkConf管理着我们所有的应用配置
+
+```text
+// in Scala
+import org.apache.spark.SparkConf
+val conf = new SparkConf().setMaster("local[2]").setAppName("DefinitiveGuide")
+.set("some.conf", "to.some.value")
+# in Python
+from pyspark import SparkConf
+conf = SparkConf().setMaster("local[2]").setAppName("DefinitiveGuide")\
+.set("some.conf", "to.some.value")
+```
+
+### 应用程序属性
+
+| Property name              | Default | Meaning                                                      |
+| -------------------------- | ------- | ------------------------------------------------------------ |
+| spark.app.name             | (none)  | 应用程序名称，将会出现在用户界面和日志里                     |
+| spark.driver.cores         | 1       | 驱动器进程使用的核心数（仅在集群模式下有效）                 |
+| spark.driver.maxResultSize | 1g      | 每个Spark动作（例如collect）所允许产生的（包括<br/>来自所有分区的）中间结果大小限制，最小设置为<br/>1MB，0代表无限制。如果产生的中间结果超过了<br/>这个限制，作业将会被强制终止。如果这个限制设<br/>置太大可能会导致 OutOfMemoryErrors错误(这也<br/>与spark.driver.memory的设置和JVM中Java对象的<br/>内存开销有关)，设置一个合理的限制会避免出现<br/>OutOfMemoryErrors错误 |
+| spark.driver.memory        | 1g      | 驱动器进程所允许使用的内存大小（例如，1g，<br/>2g）。请注意：在客户端模式下，这个参数不能再<br/>你的应用程序中通过SparkConf设置，因为执行驱<br/>动器进程的JVM在这个时候已经启动了，所以必须<br/>通过 命令行选项--driver-memory或者在配置文件中<br/>设置该值 |
+| spark.executor.memory      | 1g      | 执行器进程所允许使用的内存大小 (例如，2g，8g)                |
+| spark.extraListeners       | (none)  | 指定SparkListener的实现类，通过逗号分隔。在初<br/>始化SparkContext对象时，这些实现类将会被实例<br/>化和被注册，如果SparkListener实现类的某个构造<br/>器函数需要一个SparkConf参数，该构造器会被默<br/>认调用，否则会调用空参数的构造器，如果找不到<br/>以上构造器函数，SparkContext对象的创建将会失<br/>败并抛出异常 |
+| spark.logConf              | FALSE   | 当S p a r k C o n t e x t启动后，在日志中记录有效的<br/>SparkConf信息，并用INFO标识 |
+| spark.master               | (none)  | 设置集群管理器的URL，请参考符合规范的URL格式                 |
+| spark.submit.deployMode    | (none)  | Spark 驱动器的部署模式，即客户端模式（client）<br/>或者集群模式（cluster），客户端模式代表在本地执<br/>行，而集群模式代表在集群中的某个节点远程执行 |
+| spark.log.callerContext    | (none)  | 当运行Yarn/HDFS时，设置应用程序信息写入Yarn<br/>的RM日志中或HDFS的监听日志中。应用程序信息<br/>长度取决于Hadoop参数hadoop。caller.context.max.<br/>size，而且应该精确设置且小于50字符 |
+| spark.driver.supervise     | FALSE   | 如果设置为真，驱动进程将会在遇到一个意外退出<br/>后重新启动，仅在Spark的standalone模式和Mesos<br/>的集群配置模式下有效 |
+
+### 运行时属性
+
+驱动和执行器需要的额外classpath和Python路径、Python节点配置、以及其他日志相关的属性。
+
+### 执行属性
+
+以通过配置执行属性对应用程序进行细粒度的控制
+
+常见的配置是spark.executor.cores（用于控制使用的核心数）和spark.files.maxPartitionBytes（读取输入文件时的最大分块大小）。
+
+### 配置内存管理
+
+有时你可能需要手动配置内存选项以尝试优化应用程序，终端用户大多数情况下不需要手动进行内存管理，因为它们涉及很多旧概念，并且在Spark 2.X版本中内存的细粒度控制并不推荐使用，而是推荐使用新支持的自动内存管理。
+
+### 配置Shuffle行为
+
+Shuffle是Spark作业执行中的瓶颈，因为它的通信开销很大。因此，有许多用于控制shuffle行为的低级配置。
+
+### 环境变量
+
+你可以通过环境变量来配置Spark的某些参数，这些环境变量的默认位置是在Spark根目录下的conf/spark-env.sh脚本中读取的（或Windows上的conf/spark-env.cmd）。在Standalone模式和Mesos模式下，该文件可以提供特定主机的信息，例如主机名。此外，本地运行Spark应用程序或提交脚本时，它也会被读取和加载。
+
+在集群模式下在YARN上运行Spark时，需要使用conf/spark-defaults.conf文件中的spark.yarn.appMasterEnv.[EnvironmentVariableName]属性来设置环境变量。在spark-env.sh中设置的环境变量不会反映在集群模式下的YARN应用程序master进程中。
+
+## 集群管理器
+
+Spark有三个官方支持的集群管理器
+
+• Standalone模式。
+• Hadoop YARN。
+• Apache Mesos。
+
+集群管
+理器支持在集群上运行多个Spark应用程序并在它们之间动态地重分配资源，甚至支持非Spark应用程序共享集群资源。Spark的所有集群管理器都支持多个并发Spark应用程序，但YARN和Mesos对动态资源分配和非Spark程序共享有更好的支持。处理资源共享问题可能是使用Spark本地部署与云部署最大的区别，在公有云中，可以为每个
+应用程序构建合适的Spark集群大小，并在应用程序的生命周期内为其动态提供所需的集群资源。
+
+### Standalone集群管理器
+
+Standaone集群管理器是专门为Apache Spark工作负载构建的轻量级平台。Standaone集群管理器允许你在同一个物理集群上运行多个Spark应用程序，它还提供了简单的操作界面，也可以扩展到大规模Spark工作负载。Standaone模式的主要缺点是它的功能相对其他的集群管理器来说比较有限，特别是集群只能运行Spark作业。
+不过，如果你只想快速让Spark集群运行，并且你没有使用YARN或Mesos的经验，那么Standaone模式是最合适的。
+
+Spark的Standalone模式是最轻量级的集群管理器，并且相对易于理解和使用。但是如果后期你需要更多其他的分布式计算框架，使用YARN或Mesos则更适合。
+
+### YARN集群管理器
+
+Hadoop YARN是支持作业调度和集群资源管理的框架。S p a r k经常被误认为是“Hadoop生态系统”的一部分，但事实上，Spark与Hadoop几乎没有关系，虽然Spark本身支持Hadoop YARN集群管理器，但它并不需要Hadoop的支持。
+
+通过在spark-submit命令行参数中将master节点指定为YARN，你可以在HadoopYARN上运行Spark作业。就像使用Standalone模式一样，你可以根据需求调整集群配置
+
+YARN非常适合基于HDFS的应用程序,但不常用于其他许多应用程序。此外，YARN不太适合在云计算环境下运行，因为它需要从HDFS上获取信息，计算和存储在很大程度上是耦合在一起的，这意味着当需要扩展存储和计算中的某一种资源时，你都需要同时扩展存储和计算
+
+### Mesos集群管理器
+
+Apache Mesos将CPU、内存、存储和其他计算资源从（物理的或虚拟的）机器中抽象出来，使容错机制和弹性分布式系统能够轻松构建并有效运行
+
+Mesos是一个数据中心规模集群管理器，它不仅管理像Spark这样的短期应用程序，还管理诸如Web应用程序等长时间运行的应用程序。Mesos是一个重量级的集群管理器，只有当你的组织机构已经大规模部署了Mesos时才建议选择此集群管理器，但不可否认它仍然是一个优秀的集群管理器。
+
+Mesos支持更广泛的应用程序类型，但它仍然需要预先配置机器，并且在某种意义上来说需要更大规模的投入，但是只为运行Spark应用程序而部署Mesos集群是没多大意义的
